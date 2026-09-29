@@ -11,7 +11,7 @@
 namespace rx::ast {
 
 // 表达式类别的抽象多态基类，继承 AstNode；多种具体表达式都由 Expr 派生。
-// Parser.g4 中的优先级包装规则最终折叠为这些具体子类，而不是一层规则一个类。
+// Parser.g4 中的优先级包装规则最终折叠为这些具体子类。
 struct Expr : AstNode {
     virtual ~Expr() = default;
     [[nodiscard]] AstChildren children() const override = 0;
@@ -28,7 +28,6 @@ struct IntegerExpr final : Expr {
 };
 
 // 布尔表达式节点，继承 Expr；对应 literalExpression 中的 true/false。
-// value 为 true 或 false，不再保存关键字文本。
 struct BooleanExpr final : Expr {
     BooleanExpr();
     [[nodiscard]] AstChildren children() const override;
@@ -36,7 +35,6 @@ struct BooleanExpr final : Expr {
 };
 
 // 单元值表达式节点，继承 Expr；对应空括号 ()（或空括号表达式）。
-// 它没有额外字段，因为语法结构本身不携带其他值。
 struct UnitExpr final : Expr {
     UnitExpr();
     [[nodiscard]] AstChildren children() const override;
