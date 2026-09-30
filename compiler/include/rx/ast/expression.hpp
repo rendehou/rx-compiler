@@ -202,6 +202,10 @@ struct ArrayRepeatExpr final : Expr {
 struct StructInitializerField final : AstNode {
     StructInitializerField();
     ~StructInitializerField() override;
+    StructInitializerField(StructInitializerField&&) noexcept;
+    StructInitializerField& operator=(StructInitializerField&&) noexcept;
+    StructInitializerField(const StructInitializerField&) = delete;
+    StructInitializerField& operator=(const StructInitializerField&) = delete;
     [[nodiscard]] AstChildren children() const override;
     std::string name;                               // 初始化的字段名。
     std::unique_ptr<Expr> value;                    // 冒号后的字段值表达式子树。

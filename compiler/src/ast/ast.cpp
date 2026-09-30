@@ -267,6 +267,8 @@ AstChildren ArrayRepeatExpr::children() const {
 
 StructInitializerField::StructInitializerField() : AstNode(NodeKind::StructInitializerField) {}
 StructInitializerField::~StructInitializerField() = default;
+StructInitializerField::StructInitializerField(StructInitializerField&&) noexcept = default;
+StructInitializerField& StructInitializerField::operator=(StructInitializerField&&) noexcept = default;
 AstChildren StructInitializerField::children() const {
     AstChildren result;
     appendChild(result, value);
