@@ -1,0 +1,17 @@
+VALID PROGRAM
+enter scope 0
+declare x: i32 in scope 0
+enter scope 1
+declare x: bool in scope 1
+resolve x -> bool from scope 1
+leave scope 1
+resolve x -> i32 from scope 0
+leave scope 0
+result: ok
+DUPLICATE PROGRAM
+enter scope 0
+declare x: i32 in scope 0
+result: error: duplicate declaration of x in scope 0
+UNKNOWN PROGRAM
+enter scope 0
+result: error: unknown name: missing

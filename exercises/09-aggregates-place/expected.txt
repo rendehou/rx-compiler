@@ -1,0 +1,6 @@
+Point equals Pair: no
+p.x: i32, place, mutable
+assign p.x: unit
+assign arithmetic result: error: assignment destination is a value, not a place
+assign immutable array element: error: assignment destination is immutable
+construct missing field: error: missing field y in Point

@@ -1,0 +1,9 @@
+builtin get_i32: () -> i32
+builtin Vec::push: (&mut Vec<T>, T) -> unit
+constant A: 7
+constant X: error: constant cycle at X
+Pair Copy: yes
+Owned Copy: no
+Broken derive: error: Broken derives Copy without Clone
+Node layout: finite
+Bad layout: error: inline layout cycle at Bad

@@ -1,0 +1,2 @@
+valid: bool
+invalid: operator "+" requires (i32, i32), got (bool, i32)

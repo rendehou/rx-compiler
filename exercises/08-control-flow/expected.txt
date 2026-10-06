@@ -1,0 +1,5 @@
+if with return: i32
+loop with value: i32
+break outside: error: break outside loop
+while break value: error: while does not allow break value
+if without else: error: if without else must produce unit

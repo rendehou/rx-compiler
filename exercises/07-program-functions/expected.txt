@@ -1,0 +1,14 @@
+VALID PROGRAM
+collect twice(i32) -> i32
+collect add(i32, i32) -> i32
+collect main() -> unit
+check twice: ok
+check add: ok
+check main: ok
+entry main: ok
+result: ok
+WRONG CALL PROGRAM
+collect add(i32, i32) -> i32
+collect main() -> unit
+check add: ok
+result: error: function add expects 2 arguments, got 1

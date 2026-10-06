@@ -1,0 +1,17 @@
+good.rx
+lexer/parser
+ast builder
+declaration collector
+semantic checker
+exit 0
+syntax-bad.rx
+lexer/parser
+error: syntax error; stop before AST
+exit 1
+semantic-bad.rx
+lexer/parser
+ast builder
+declaration collector
+semantic checker
+error: type mismatch
+exit 1

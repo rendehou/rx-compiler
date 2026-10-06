@@ -1,0 +1,7 @@
+&mut immutable x: error: cannot mutably borrow immutable place
+&mut mutable x: &mut i32
+coerce &mut i32 to &i32: &i32
+write through &&mut i32: denied
+mutable counter.increase: unit
+immutable counter.get: i32
+immutable counter.increase: error: method increase requires mutable receiver

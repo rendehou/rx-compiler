@@ -1,0 +1,7 @@
+Binary "+"
+  Integer "12"
+  Binary "*"
+    Integer "3"
+    Binary "+"
+      Integer "4"
+      Integer "5"

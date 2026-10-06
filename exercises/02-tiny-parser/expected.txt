@@ -1,0 +1,20 @@
+Expression
+  Term
+    Primary
+      INTEGER "12"
+  PLUS "+"
+  Term
+    Primary
+      INTEGER "3"
+    STAR "*"
+    Primary
+      LPAREN "("
+      Expression
+        Term
+          Primary
+            INTEGER "4"
+        PLUS "+"
+        Term
+          Primary
+            INTEGER "5"
+      RPAREN ")"
