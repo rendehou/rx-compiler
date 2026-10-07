@@ -12,6 +12,7 @@ namespace rx::frontend {
 // Owns every ANTLR object on which the returned CrateContext depends.
 // A tree pointer becomes invalid when its ParsedSource is destroyed.
 class ParsedSource final {
+    //连接antrl的接口，ok()可以判断词法和语法解析是否成功，tree()获得树根节点
 public:
     static std::unique_ptr<ParsedSource> parse(std::string source);
 

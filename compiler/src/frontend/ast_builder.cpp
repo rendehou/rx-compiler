@@ -541,20 +541,19 @@ AstBuilder::buildPathExprSegment(RxParser::PathExprSegmentContext* context) {
     return segment;
 }
 
-
-
-
-
-// 构造代码块；当前版本暂时只支持空块。
-ast::Block 
+// 构造代码块：普通语句按序保存，末尾无分号表达式成为块尾值。
+ast::Block
 AstBuilder::buildBlock(RxParser::BlockExpressionContext* context) {
-    // 普通statement和尾表达式语义不同；当前遇到任意非空内容都会报错。
-    if (!context->statement().empty() ||
-        context->statementExpression() != nullptr) {
-        throw std::logic_error("this first example only supports an empty body");
+    ast::Block block;
+
+    for (auto* statement : context->statement()) {
+        block.statements.push_back(buildStatement(statement));
+    }
+    if (auto* tail = context->statementExpression()) {
+        block.tail = buildStatementExpression(tail);
     }
 
-    return ast::Block{};
+    return block;
 }
 
 std::unique_ptr<ast::LetStatement>
@@ -1521,7 +1520,736 @@ AstBuilder::buildConditionPrimaryWithoutBareBlock(
 
 }
 
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakExpression(
+        RxParser::ConditionBreakExpressionContext* context) {
+    return buildConditionBreakAssignmentExpression(
+        context->conditionBreakAssignmentExpression());
+}
 
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakAssignmentExpression(
+        RxParser::ConditionBreakAssignmentExpressionContext* context) {
+    if (auto* assignment = context->assignmentOperator()) {
+        auto expression = std::make_unique<ast::AssignmentExpr>();
+        expression->place = buildConditionBreakLogicalOrExpression(
+            context->conditionBreakLogicalOrExpression());
+        expression->value = buildConditionExpression(context->conditionExpression());
+        expression->op = mapAssignmentOperator(assignment);
+        return expression;
+    }
+
+    return buildConditionBreakLogicalOrExpression(
+        context->conditionBreakLogicalOrExpression());
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakLogicalOrExpression(
+        RxParser::ConditionBreakLogicalOrExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakLogicalAndExpressionContext*>(child)) {
+            return buildConditionBreakLogicalAndExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionLogicalAndExpressionContext*>(child)) {
+            return buildConditionLogicalAndExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakLogicalAndExpression(
+        RxParser::ConditionBreakLogicalAndExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakComparisonExpressionContext*>(child)) {
+            return buildConditionBreakComparisonExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionComparisonExpressionContext*>(child)) {
+            return buildConditionComparisonExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakComparisonExpression(
+        RxParser::ConditionBreakComparisonExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakBitOrExpressionContext*>(child)) {
+            return buildConditionBreakBitOrExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakClosedBitOrExpressionContext*>(child)) {
+            return buildConditionBreakClosedBitOrExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBitOrExpressionContext*>(child)) {
+            return buildConditionBitOrExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakBitOrExpression(
+        RxParser::ConditionBreakBitOrExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakBitXorExpressionContext*>(child)) {
+            return buildConditionBreakBitXorExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBitXorExpressionContext*>(child)) {
+            return buildConditionBitXorExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakClosedBitOrExpression(
+        RxParser::ConditionBreakClosedBitOrExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakBitXorExpressionContext*>(child)) {
+            return buildConditionBreakBitXorExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakClosedBitXorExpressionContext*>(child)) {
+            return buildConditionBreakClosedBitXorExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBitXorExpressionContext*>(child)) {
+            return buildConditionBitXorExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionClosedBitXorExpressionContext*>(child)) {
+            return buildConditionClosedBitXorExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakBitXorExpression(
+        RxParser::ConditionBreakBitXorExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakBitAndExpressionContext*>(child)) {
+            return buildConditionBreakBitAndExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBitAndExpressionContext*>(child)) {
+            return buildConditionBitAndExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakClosedBitXorExpression(
+        RxParser::ConditionBreakClosedBitXorExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakBitAndExpressionContext*>(child)) {
+            return buildConditionBreakBitAndExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakClosedBitAndExpressionContext*>(child)) {
+            return buildConditionBreakClosedBitAndExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBitAndExpressionContext*>(child)) {
+            return buildConditionBitAndExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionClosedBitAndExpressionContext*>(child)) {
+            return buildConditionClosedBitAndExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakBitAndExpression(
+        RxParser::ConditionBreakBitAndExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakShiftExpressionContext*>(child)) {
+            return buildConditionBreakShiftExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionShiftExpressionContext*>(child)) {
+            return buildConditionShiftExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakClosedBitAndExpression(
+        RxParser::ConditionBreakClosedBitAndExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakShiftExpressionContext*>(child)) {
+            return buildConditionBreakShiftExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakClosedShiftExpressionContext*>(child)) {
+            return buildConditionBreakClosedShiftExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionShiftExpressionContext*>(child)) {
+            return buildConditionShiftExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionClosedShiftExpressionContext*>(child)) {
+            return buildConditionClosedShiftExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakShiftExpression(
+        RxParser::ConditionBreakShiftExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakAdditiveExpressionContext*>(child)) {
+            return buildConditionBreakAdditiveExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakClosedAdditiveExpressionContext*>(child)) {
+            return buildConditionBreakClosedAdditiveExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionAdditiveExpressionContext*>(child)) {
+            return buildConditionAdditiveExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionClosedAdditiveExpressionContext*>(child)) {
+            return buildConditionClosedAdditiveExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakClosedShiftExpression(
+        RxParser::ConditionBreakClosedShiftExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakAdditiveExpressionContext*>(child)) {
+            return buildConditionBreakAdditiveExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakClosedAdditiveExpressionContext*>(child)) {
+            return buildConditionBreakClosedAdditiveExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionAdditiveExpressionContext*>(child)) {
+            return buildConditionAdditiveExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionClosedAdditiveExpressionContext*>(child)) {
+            return buildConditionClosedAdditiveExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakAdditiveExpression(
+        RxParser::ConditionBreakAdditiveExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakMultiplicativeExpressionContext*>(child)) {
+            return buildConditionBreakMultiplicativeExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionMultiplicativeExpressionContext*>(child)) {
+            return buildConditionMultiplicativeExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakClosedAdditiveExpression(
+        RxParser::ConditionBreakClosedAdditiveExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakMultiplicativeExpressionContext*>(child)) {
+            return buildConditionBreakMultiplicativeExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakClosedMultiplicativeExpressionContext*>(child)) {
+            return buildConditionBreakClosedMultiplicativeExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionMultiplicativeExpressionContext*>(child)) {
+            return buildConditionMultiplicativeExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionClosedMultiplicativeExpressionContext*>(child)) {
+            return buildConditionClosedMultiplicativeExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakMultiplicativeExpression(
+        RxParser::ConditionBreakMultiplicativeExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakCastExpressionContext*>(child)) {
+            return buildConditionBreakCastExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionCastExpressionContext*>(child)) {
+            return buildConditionCastExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakClosedMultiplicativeExpression(
+        RxParser::ConditionBreakClosedMultiplicativeExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakCastExpressionContext*>(child)) {
+            return buildConditionBreakCastExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionBreakClosedCastExpressionContext*>(child)) {
+            return buildConditionBreakClosedCastExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionCastExpressionContext*>(child)) {
+            return buildConditionCastExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ConditionClosedCastExpressionContext*>(child)) {
+            return buildConditionClosedCastExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakCastExpression(
+        RxParser::ConditionBreakCastExpressionContext* context) {
+    auto result = buildConditionBreakUnaryExpression(
+        context->conditionBreakUnaryExpression());
+    for (auto* target : context->typeRef()) {
+        auto cast = std::make_unique<ast::CastExpr>();
+        cast->value = std::move(result);
+        cast->target_type = buildTypeRef(target);
+        result = std::move(cast);
+    }
+    return result;
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakClosedCastExpression(
+        RxParser::ConditionBreakClosedCastExpressionContext* context) {
+    if (context->closedCastType() != nullptr) {
+        auto cast = std::make_unique<ast::CastExpr>();
+        cast->value = buildConditionBreakCastExpression(
+            context->conditionBreakCastExpression());
+        cast->target_type = buildClosedCastType(context->closedCastType());
+        return cast;
+    }
+    return buildConditionBreakUnaryExpression(
+        context->conditionBreakUnaryExpression());
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakUnaryExpression(
+        RxParser::ConditionBreakUnaryExpressionContext* context) {
+    if (auto* unary = context->unaryOperator()) {
+        auto expression = std::make_unique<ast::UnaryExpr>();
+        expression->op = mapUnaryOperator(unary);
+        expression->operand =
+            buildConditionUnaryExpression(context->conditionUnaryExpression());
+        return expression;
+    }
+    return buildConditionBreakPostfixExpression(
+        context->conditionBreakPostfixExpression());
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildConditionBreakPostfixExpression(
+        RxParser::ConditionBreakPostfixExpressionContext* context) {
+    return applyPostfixSuffixes(
+        buildConditionPrimaryWithoutBareBlock(
+            context->conditionPrimaryWithoutBareBlock()),
+        context->postfixSuffix());
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementExpression(RxParser::StatementExpressionContext* context) {
+    return buildStatementAssignmentExpression(
+        context->statementAssignmentExpression());
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementAssignmentExpression(
+        RxParser::StatementAssignmentExpressionContext* context) {
+    if (auto* assignment = context->assignmentOperator()) {
+        auto expression = std::make_unique<ast::AssignmentExpr>();
+        expression->place = buildStatementLogicalOrExpression(
+            context->statementLogicalOrExpression());
+        expression->value = buildExpression(context->expression());
+        expression->op = mapAssignmentOperator(assignment);
+        return expression;
+    }
+
+    return buildStatementLogicalOrExpression(context->statementLogicalOrExpression());
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementLogicalOrExpression(
+        RxParser::StatementLogicalOrExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementLogicalAndExpressionContext*>(child)) {
+            return buildStatementLogicalAndExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::LogicalAndExpressionContext*>(child)) {
+            return buildLogicalAndExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementLogicalAndExpression(
+        RxParser::StatementLogicalAndExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementComparisonExpressionContext*>(child)) {
+            return buildStatementComparisonExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ComparisonExpressionContext*>(child)) {
+            return buildComparisonExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementComparisonExpression(
+        RxParser::StatementComparisonExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementBitOrExpressionContext*>(child)) {
+            return buildStatementBitOrExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementClosedBitOrExpressionContext*>(child)) {
+            return buildStatementClosedBitOrExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::BitOrExpressionContext*>(child)) {
+            return buildBitOrExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementBitOrExpression(
+        RxParser::StatementBitOrExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementBitXorExpressionContext*>(child)) {
+            return buildStatementBitXorExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::BitXorExpressionContext*>(child)) {
+            return buildBitXorExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementClosedBitOrExpression(
+        RxParser::StatementClosedBitOrExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementBitXorExpressionContext*>(child)) {
+            return buildStatementBitXorExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementClosedBitXorExpressionContext*>(child)) {
+            return buildStatementClosedBitXorExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::BitXorExpressionContext*>(child)) {
+            return buildBitXorExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::ClosedBitXorExpressionContext*>(child)) {
+            return buildClosedBitXorExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementBitXorExpression(
+        RxParser::StatementBitXorExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementBitAndExpressionContext*>(child)) {
+            return buildStatementBitAndExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::BitAndExpressionContext*>(child)) {
+            return buildBitAndExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementClosedBitXorExpression(
+        RxParser::StatementClosedBitXorExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementBitAndExpressionContext*>(child)) {
+            return buildStatementBitAndExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementClosedBitAndExpressionContext*>(child)) {
+            return buildStatementClosedBitAndExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::BitAndExpressionContext*>(child)) {
+            return buildBitAndExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::ClosedBitAndExpressionContext*>(child)) {
+            return buildClosedBitAndExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementBitAndExpression(
+        RxParser::StatementBitAndExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementShiftExpressionContext*>(child)) {
+            return buildStatementShiftExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::ShiftExpressionContext*>(child)) {
+            return buildShiftExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementClosedBitAndExpression(
+        RxParser::StatementClosedBitAndExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementShiftExpressionContext*>(child)) {
+            return buildStatementShiftExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementClosedShiftExpressionContext*>(child)) {
+            return buildStatementClosedShiftExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::ShiftExpressionContext*>(child)) {
+            return buildShiftExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::ClosedShiftExpressionContext*>(child)) {
+            return buildClosedShiftExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementShiftExpression(
+        RxParser::StatementShiftExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementAdditiveExpressionContext*>(child)) {
+            return buildStatementAdditiveExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementClosedAdditiveExpressionContext*>(child)) {
+            return buildStatementClosedAdditiveExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::AdditiveExpressionContext*>(child)) {
+            return buildAdditiveExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::ClosedAdditiveExpressionContext*>(child)) {
+            return buildClosedAdditiveExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementClosedShiftExpression(
+        RxParser::StatementClosedShiftExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementAdditiveExpressionContext*>(child)) {
+            return buildStatementAdditiveExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementClosedAdditiveExpressionContext*>(child)) {
+            return buildStatementClosedAdditiveExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::AdditiveExpressionContext*>(child)) {
+            return buildAdditiveExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::ClosedAdditiveExpressionContext*>(child)) {
+            return buildClosedAdditiveExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementAdditiveExpression(
+        RxParser::StatementAdditiveExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementMultiplicativeExpressionContext*>(child)) {
+            return buildStatementMultiplicativeExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::MultiplicativeExpressionContext*>(child)) {
+            return buildMultiplicativeExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementClosedAdditiveExpression(
+        RxParser::StatementClosedAdditiveExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementMultiplicativeExpressionContext*>(child)) {
+            return buildStatementMultiplicativeExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementClosedMultiplicativeExpressionContext*>(child)) {
+            return buildStatementClosedMultiplicativeExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::MultiplicativeExpressionContext*>(child)) {
+            return buildMultiplicativeExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::ClosedMultiplicativeExpressionContext*>(child)) {
+            return buildClosedMultiplicativeExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementMultiplicativeExpression(
+        RxParser::StatementMultiplicativeExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementCastExpressionContext*>(child)) {
+            return buildStatementCastExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::CastExpressionContext*>(child)) {
+            return buildCastExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementClosedMultiplicativeExpression(
+        RxParser::StatementClosedMultiplicativeExpressionContext* context) {
+    return buildBinaryChain(context, [this](antlr4::tree::ParseTree* child) {
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementCastExpressionContext*>(child)) {
+            return buildStatementCastExpression(operand);
+        }
+        if (auto* operand =
+                dynamic_cast<RxParser::StatementClosedCastExpressionContext*>(child)) {
+            return buildStatementClosedCastExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::CastExpressionContext*>(child)) {
+            return buildCastExpression(operand);
+        }
+        if (auto* operand = dynamic_cast<RxParser::ClosedCastExpressionContext*>(child)) {
+            return buildClosedCastExpression(operand);
+        }
+        return std::unique_ptr<ast::Expr>{};
+    });
+}
+
+
+
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementCastExpression(
+        RxParser::StatementCastExpressionContext* context) {
+    auto result = buildStatementUnaryExpression(context->statementUnaryExpression());
+    for (auto* target : context->typeRef()) {
+        auto cast = std::make_unique<ast::CastExpr>();
+        cast->value = std::move(result);
+        cast->target_type = buildTypeRef(target);
+        result = std::move(cast);
+    }
+    return result;
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementClosedCastExpression(
+        RxParser::StatementClosedCastExpressionContext* context) {
+    if (context->closedCastType() != nullptr) {
+        auto cast = std::make_unique<ast::CastExpr>();
+        cast->value = buildStatementCastExpression(context->statementCastExpression());
+        cast->target_type = buildClosedCastType(context->closedCastType());
+        return cast;
+    }
+    return buildStatementUnaryExpression(context->statementUnaryExpression());
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementUnaryExpression(
+        RxParser::StatementUnaryExpressionContext* context) {
+    if (auto* unary = context->unaryOperator()) {
+        auto expression = std::make_unique<ast::UnaryExpr>();
+        expression->op = mapUnaryOperator(unary);
+        expression->operand = buildUnaryExpression(context->unaryExpression());
+        return expression;
+    }
+    return buildStatementPostfixExpression(context->statementPostfixExpression());
+}
+
+std::unique_ptr<ast::Expr>
+AstBuilder::buildStatementPostfixExpression(
+        RxParser::StatementPostfixExpressionContext* context) {
+    if (auto* primary = context->nonBlockPrimary()) {
+        return applyPostfixSuffixes(buildNonBlockPrimary(primary),
+                                    context->postfixSuffix());
+    }
+
+    auto base = buildExpressionWithBlock(context->expressionWithBlock());
+    return applyPostfixSuffixes(applyDotSuffix(std::move(base), context->dotSuffix()),
+                                context->postfixSuffix());
+}
 
 // 根据statement分支构造具体节点，并保留分号信息。
 std::unique_ptr<ast::Statement>

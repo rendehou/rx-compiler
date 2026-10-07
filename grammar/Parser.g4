@@ -9,11 +9,11 @@ crate
     ;
 
 item
-    : useDeclaration
-    | functionDefinition
+    : useDeclaration //作用域声明
+    | functionDefinition 
     | structDefinition
-    | constantItem
-    | inherentImpl
+    | constantItem 
+    | inherentImpl //类似于在类外定义函数
     ;
 
 useDeclaration

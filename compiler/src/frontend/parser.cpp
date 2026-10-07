@@ -10,6 +10,7 @@
 namespace rx::frontend {
 namespace {
 
+//负责聆听错误
 class CollectingErrorListener final : public antlr4::BaseErrorListener {
 public:
     CollectingErrorListener(std::vector<Diagnostic>& diagnostics,
@@ -30,7 +31,7 @@ private:
 
 }  // namespace
 
-class ParsedSource::Impl {
+class ParsedSource::Impl {//创建parser和lexer实例供antrl使用
 public:
     explicit Impl(std::string source_text)
         : source_text_(std::move(source_text)),
@@ -46,6 +47,7 @@ public:
         parser_.removeErrorListeners();
         parser_.addErrorListener(&parser_errors);
 
+        //从根节点开始递归调用函数建立context解析树
         tree_ = parser_.crate();
 
         // The listeners above live only for this parse.  Remove their pointers
