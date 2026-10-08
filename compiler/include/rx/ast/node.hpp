@@ -82,7 +82,7 @@ protected:
     explicit AstNode(NodeKind category) : category(category) {}
 };
 
-// 以下辅助函数把拥有型成员转换成 children() 所需的非拥有指针列表。
+// 以下辅助函数把不同类的chilid转换成children类，统一孩子
 inline void appendChild(AstChildren& result, const AstNode* child) {
     if (child != nullptr) result.push_back(child);
 }

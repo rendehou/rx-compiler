@@ -23,6 +23,7 @@ std::string readSource(const std::string& path) {
             std::istreambuf_iterator<char>()};
 }
 
+
 void printUsage(const char* program) {
     std::cerr << "usage: " << program
               << " (--dump-parse-tree|--check-syntax) <source.rx|->\n";
