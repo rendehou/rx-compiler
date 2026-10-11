@@ -1,7 +1,0 @@
-[package]
-name = "rx-antlr-cst"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-antlr4rust = "0.6"

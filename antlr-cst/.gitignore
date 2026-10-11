@@ -1,6 +1,4 @@
 /target/
+/build/
 /.tools/
-/src/generated/*.rs
-!/src/generated/mod.rs
-/src/generated/*.tokens
-/src/generated/*.interp
+/src/generated/

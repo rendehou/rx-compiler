@@ -1,13 +1,13 @@
-ANTLR_VERSION := 0.6.0
-ANTLR_JAR ?= .tools/antlr4-4.13.3-SNAPSHOT-complete.jar
-ANTLR_URL := https://github.com/antlr4rust/antlr4/releases/download/v$(ANTLR_VERSION)/antlr4-4.13.3-SNAPSHOT-complete.jar
-ANTLR_SHA256 := 391e77311794f7c8fed2bc6d291f54b04725e37456d79e1981edfd3fc919b677
+ANTLR_VERSION := 4.13.2
+ANTLR_JAR ?= .tools/antlr-$(ANTLR_VERSION)-complete.jar
+ANTLR_URL := https://www.antlr.org/download/antlr-$(ANTLR_VERSION)-complete.jar
+ANTLR_SHA256 := eae2dfa119a64327444672aff63e9ec35a20180dc5b8090b7a6ab85125df4d76
 GRAMMAR_DIR := ../grammar
-PREP_DIR := .tools/grammar
 GEN_DIR := src/generated
+BUILD_DIR := build
 INPUT ?= samples/minimal.rx
 
-.PHONY: prepare generate cst clean
+.PHONY: generate cst clean
 
 $(ANTLR_JAR):
 	mkdir -p "$(dir $@)"
@@ -15,18 +15,15 @@ $(ANTLR_JAR):
 	echo "$(ANTLR_SHA256)  $@.download" | sha256sum -c -
 	mv "$@.download" "$@"
 
-prepare:
-	python3 scripts/prepare_grammar.py "$(GRAMMAR_DIR)" "$(PREP_DIR)"
-
-generate: $(ANTLR_JAR) prepare
+generate: $(ANTLR_JAR)
 	mkdir -p "$(GEN_DIR)"
-	java -jar "$(ANTLR_JAR)" -Dlanguage=Rust -Xexact-output-dir -o "$(GEN_DIR)" "$(PREP_DIR)/RxLexer.g4"
-	java -jar "$(ANTLR_JAR)" -Dlanguage=Rust -visitor -Xexact-output-dir -lib "$(GEN_DIR)" -o "$(GEN_DIR)" "$(PREP_DIR)/RxParser.g4"
+	java -jar "$(ANTLR_JAR)" -Dlanguage=Cpp -visitor -Xexact-output-dir -o "$(GEN_DIR)" "$(GRAMMAR_DIR)/Lexer.g4"
+	java -jar "$(ANTLR_JAR)" -Dlanguage=Cpp -visitor -Xexact-output-dir -lib "$(GEN_DIR)" -o "$(GEN_DIR)" "$(GRAMMAR_DIR)/Parser.g4"
 
 cst: generate
-	cargo run -- "$(INPUT)"
+	cmake -S . -B "$(BUILD_DIR)" -DCMAKE_BUILD_TYPE=Release
+	cmake --build "$(BUILD_DIR)" --parallel
+	"$(BUILD_DIR)/rx-cst" "$(INPUT)"
 
 clean:
-	find "$(GEN_DIR)" -maxdepth 1 -type f -name '*.rs' ! -name mod.rs -delete
-	rm -f "$(GEN_DIR)"/*.tokens "$(GEN_DIR)"/*.interp
-	rm -rf "$(PREP_DIR)"
+	rm -rf "$(BUILD_DIR)" "$(GEN_DIR)"

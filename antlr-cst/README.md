@@ -1,18 +1,21 @@
-# Rx ANTLR CST viewer
+# Rx ANTLR CST viewer (C++)
 
-This small Rust program generates a lexer and parser from the repository's
-`grammar/Lexer.g4` and `grammar/Parser.g4`, parses an Rx source file, and prints
-ANTLR's parenthesized concrete syntax tree (CST). It does not build an AST.
+This standalone C++ program uses the repository's `grammar/Lexer.g4` and
+`grammar/Parser.g4` to parse an Rx source file and print ANTLR's parenthesized
+concrete syntax tree (CST). The original grammar files are used directly and
+are not modified. This tool only displays the CST; it does not build an AST.
 
 ## Requirements
 
 - Java 11 or newer
-- Rust and Cargo
-- `curl` and `sha256sum` (only needed to download the pinned generator)
+- C++17 compiler and CMake 3.18 or newer
+- `curl` and `sha256sum` (only needed to download the pinned ANTLR tool)
+- Network access on the first CMake configure, to fetch the matching C++ runtime
 
-The Rust target is provided by the `antlr4rust` generator and runtime, both
-pinned to the 0.6 line. The generator jar is downloaded into `.tools/` and is
-not committed.
+ANTLR's Java generator and C++ runtime are separate components. `make generate`
+downloads ANTLR 4.13.2 and writes C++ lexer, parser, listener, and visitor files
+to `src/generated/`. `make cst` also configures and builds the C++ runtime from
+the matching ANTLR 4.13.2 source tag, compiles the viewer, and prints the tree.
 
 ## Run
 
@@ -23,22 +26,12 @@ make cst
 make cst INPUT=path/to/example.rx
 ```
 
-The first run downloads the pinned ANTLR generator if needed, generates Rust
-sources under `src/generated/`, then compiles and runs the viewer. The parser
-entry rule is `crate`. The output is ANTLR's parenthesized tree: rule names
-appear as branches, while matched tokens (including punctuation) appear as
-leaves.
+The parser entry rule is `crate`. Rule names appear as branches in the output;
+matched tokens, including punctuation, appear as leaves. Whitespace and
+comments are assigned to the lexer's hidden channel, so they are not shown in
+the printed tree.
 
-The Makefile copies the two source grammars into `.tools/grammar/` and renames
-their declarations to `RxLexer` and `RxParser`. This avoids Rust name clashes;
-the repository's original grammar files are left untouched. The parser uses
-the token vocabulary generated from the lexer, so the lexer runs first. Both
-listener and visitor code are generated.
-
-Generated Rust sources, token files, and ANTLR metadata are ignored by Git.
-After changing a source grammar, run `make generate`; `src/generated/mod.rs`
-lists the generated Rust modules.
-
-Whitespace and comments are assigned to ANTLR's hidden channel by the lexer.
-They remain available in the token stream, but are not children in the printed
-parse tree.
+Run `make generate` after changing either source grammar. Run `make clean` to
+remove generated C++ files and the CMake build directory. Downloads are kept in
+`.tools/` and build artifacts are kept in `build/`; both directories are ignored
+by Git.
