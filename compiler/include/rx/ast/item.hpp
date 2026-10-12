@@ -111,10 +111,10 @@ struct FunctionItem final : Item {
     FunctionItem();
     [[nodiscard]] AstChildren children() const override;
     std::string name;                               // 函数名。
-    GenericParameters generic_parameters;           // 可选的泛型生命周期参数列表。
-    std::optional<Receiver> receiver;                // impl 方法可选的 self 接收者。
-    std::vector<FunctionParameter> parameters;      // 普通参数列表，按源码顺序。
-    std::optional<TypeSyntax> return_type;           // 显式 -> 后的返回类型；未写箭头时为空。
+    std::shared_ptr<GenericParameters> generic_parameters;           // 可选的泛型生命周期参数列表。
+    std::shared_ptr<Receiver> receiver;                // impl 方法可选的 self 接收者。
+    std::vector<std::shared_ptr<FunctionParameter>> parameters;      // 普通参数列表，按源码顺序。
+    std::shared_ptr<TypeSyntax> return_type;           // 显式 -> 后的返回类型；未写箭头时为空。
     WhereClause where_clause;                       // 可选 where 子句。
     Block body;                                     // 函数体 blockExpression。
 };
