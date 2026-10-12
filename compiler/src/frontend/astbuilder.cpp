@@ -24,7 +24,6 @@ namespace rx::frontend {
         );
     }
 
-
     //下面开始是具体的
     std::any AstBuilder::visitCrate(Parser::CrateContext* ctx) {
 
@@ -100,7 +99,6 @@ namespace rx::frontend {
         );
     }
 
-
     std::any AstBuilder::visitStructDefinition(
         Parser::StructDefinitionContext* ctx
     ) {
@@ -146,7 +144,6 @@ namespace rx::frontend {
         );
     }
 
-
     std::any AstBuilder::visitConstantItem(
         Parser::ConstantItemContext* ctx
     ) {
@@ -170,7 +167,6 @@ namespace rx::frontend {
         );
     }
 
-
     std::any AstBuilder::visitInherentImpl(
         Parser::InherentImplContext* ctx
     ) {
@@ -183,12 +179,12 @@ namespace rx::frontend {
             );
         }
 
-        // impl 的目标类型
+        // impl的目标类型,在impl中定义语句的类型
         impl->target_type = asNode<ast::TypeSyntax>(
             visit(ctx->typeRef())
         );
 
-        // where
+        // where语句，是用于约束泛型的
         if (auto* where = ctx->whereClause()) {
             impl->where_clause = asNode<ast::WhereClause>(
                 visit(where)
@@ -213,11 +209,111 @@ namespace rx::frontend {
         auto use = std::make_shared<ast::UseItem>();
 
         use->tree = asNode<ast::UseTree>(
-                visit(ctx->useTree())
-         );
-
-        return std::static_pointer_cast<ast::AstNode>(
-            use
+            visit(ctx->useTree())
         );
+
+        return std::static_pointer_cast<ast::AstNode>(use);
     }
+
+    //第二部分
+    std::any AstBuilder::visitGenericParams(
+        Parser::GenericParamsContext* ctx
+    ) {
+
+        auto parameters = std::make_shared<ast::GenericParameters>();
+
+        parameters->written = true;//存在这个泛型参数
+        for (
+            auto* lifetimeCtx : ctx->lifetimeParam()
+        ) {
+            parameters->lifetimes.push_back(
+                asNode<ast::LifetimeParameter>(
+                    visit(lifetimeCtx)
+                )
+            );
+        }
+
+
+        return std::static_pointer_cast<ast::AstNode>(parameters);
+    }
+
+    std::any AstBuilder::visitLifetimeParam(
+        Parser::LifetimeParamContext* ctx
+    ) {
+        auto lifetime = std::make_shared<ast::LifetimeParameter>();
+
+        lifetime->name = ctx->lifetime()->getText();
+
+        if (auto* bounds = ctx->lifetimeBounds()) {
+            for (auto* boundCtx :bounds->lifetime()) {
+                lifetime->bounds.push_back(
+                    boundCtx->getText()
+                );
+            }
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(lifetime);
+    }
+
+    std::any AstBuilder::visitSelfParam(//代表自身的参数
+        Parser::SelfParamContext* ctx
+    ) {
+
+        auto receiver = std::make_shared<ast::Receiver>();
+        if (ctx->AMP()) {
+            if (ctx->MUT()) {//参数类别
+                receiver->kind = ast::ReceiverKind::MutableReference;
+            } else {
+                receiver->kind = ast::ReceiverKind:: SharedReference;
+            }
+        } else {
+
+            if (ctx->MUT()) {
+                receiver->kind = ast::ReceiverKind:: MutableValue;
+            } else {
+                receiver->kind =ast::ReceiverKind:: Value;
+            }
+        }
+
+        if (ctx->lifetime()) {
+            receiver->lifetime = ctx->lifetime()->getText();
+        }
+        return std::static_pointer_cast<ast::AstNode>(receiver);
+    }
+
+
+    std::any AstBuilder::visitFunctionParam(
+        Parser::FunctionParamContext* ctx
+    ) {
+
+        auto parameter =std::make_shared<ast::FunctionParameter>();
+
+        parameter->name = ctx->identifierBinding()->identifier()->getText();
+
+        parameter->mutable_binding = ctx->identifierBinding()->MUT()!= nullptr;//判断是否有mut
+
+        parameter->type = asNode<ast::TypeSyntax>(
+             visit(ctx->typeRef())
+        );
+
+        return std::static_pointer_cast<ast::AstNode>(parameter);
+    }
+    std::any AstBuilder::visitWhereClause(
+        Parser::WhereClauseContext* ctx
+    ) {
+
+        auto where = std::make_shared<ast::WhereClause>();
+
+        where->written = true;
+
+        for (auto* itemCtx : ctx->whereClauseItem()) {
+            where->predicates.push_back(
+                asNode<ast::WherePredicate>(//对应 whereClauseItem 规则的两种形式。保存主体及其生命周期边界。
+                    visit(itemCtx)
+                )
+            );
+        }
+        return std::static_pointer_cast<ast::AstNode>(where);
+    }
+    
 }
