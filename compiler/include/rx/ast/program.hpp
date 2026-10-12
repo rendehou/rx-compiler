@@ -14,7 +14,7 @@ struct Program final : AstNode {
     Program() : AstNode(NodeKind::Program) {}
     [[nodiscard]] AstChildren children() const override;
 
-    std::vector<std::unique_ptr<Item>> items;  // crate 中的顶层条目，顺序与源码一致。
+    std::vector<std::shared_ptr<Item>> items;  // crate 中的顶层条目，顺序与源码一致。
 };
 
 }  // namespace rx::ast

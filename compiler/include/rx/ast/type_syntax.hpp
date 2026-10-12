@@ -51,7 +51,7 @@ struct ConstValueSyntax final : AstNode {
     std::string integer_spelling;                   // 整数字面量原文，仅 Integer 时使用。
     bool boolean_value = false;                    // true/false 的值，仅 Boolean 时使用。
     Path path;                                      // 常量路径，仅 Path 时使用。
-    std::unique_ptr<ConstValueSyntax> operand;      // 一元负号后的常量，仅 Negate 时使用。
+    std::shared_ptr<ConstValueSyntax> operand;      // 一元负号后的常量，仅 Negate 时使用。
 };
 
 // 类型语法的具体形式标签；TypeSyntax 用它选择下面对应的类型字段。
@@ -71,9 +71,9 @@ struct TypeSyntax final : AstNode {
     Path path;                                    // kind 为 Path 时保存的类型路径。
     std::string lifetime;                         // 引用类型显式写出的生命周期；未写时为空。
     bool mutable_reference = false;               // 引用类型是否带 mut。
-    std::unique_ptr<TypeSyntax> referent;          // 引用所指向的内部类型。
-    std::unique_ptr<TypeSyntax> array_element;     // 数组元素类型。
-    std::unique_ptr<ConstValueSyntax> length;      // 数组长度常量语法。
+    std::shared_ptr<TypeSyntax> referent;          // 引用所指向的内部类型。
+    std::shared_ptr<TypeSyntax> array_element;     // 数组元素类型。
+    std::shared_ptr<ConstValueSyntax> length;      // 数组长度常量语法。
 };
 
 // 泛型实参具体形式标签；GenericArgumentSyntax 用它区分生命周期实参和类型实参。

@@ -75,7 +75,7 @@ public:
     virtual ~AstNode() = default;
 
     // 返回本节点的直接孩子，不拥有孩子；孩子的实际所有权仍由各派生类的
-    // unique_ptr、vector 或值成员保存。叶节点返回空列表。
+    // shared_ptr、vector 或值成员保存。叶节点返回空列表。
     [[nodiscard]] virtual AstChildren children() const { return {}; }
 
 protected:
@@ -92,7 +92,7 @@ inline void appendChild(AstChildren& result, const AstNode& child) {
 }
 
 template <class T>
-inline void appendChild(AstChildren& result, const std::unique_ptr<T>& child) {
+inline void appendChild(AstChildren& result, const std::shared_ptr<T>& child) {
     appendChild(result, child.get());
 }
 

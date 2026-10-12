@@ -37,7 +37,7 @@ struct LetStatement final : Statement {
     std::string name;                              // 被声明的变量名。
     bool mutable_binding = false;                 // 绑定是否写了 mut。
     std::optional<TypeSyntax> declared_type;       // 可选冒号类型；未显式标注时为空。
-    std::unique_ptr<Expr> initializer;             // 等号后的初始化表达式，拥有该子树。
+    std::shared_ptr<Expr> initializer;             // 等号后的初始化表达式，拥有该子树。
 };
 
 // 表达式语句节点，继承 Statement；对应带分号的表达式或可选分号的块表达式语句。
@@ -46,7 +46,7 @@ struct ExpressionStatement final : Statement {
     ExpressionStatement();
     ~ExpressionStatement() override;
     [[nodiscard]] AstChildren children() const override;
-    std::unique_ptr<Expr> expression;              // 语句中的表达式子树。
+    std::shared_ptr<Expr> expression;              // 语句中的表达式子树。
     bool has_semicolon = false;                    // 源码中是否实际写了分号。
 };
 
@@ -61,8 +61,8 @@ struct Block final : AstNode {
     Block& operator=(const Block&) = delete;
     [[nodiscard]] AstChildren children() const override;
 
-    std::vector<std::unique_ptr<Statement>> statements; // 花括号内按顺序出现的普通语句。
-    std::unique_ptr<Expr> tail;                         // 可选末尾值表达式；不存在时为空。
+    std::vector<std::shared_ptr<Statement>> statements; // 花括号内按顺序出现的普通语句。
+    std::shared_ptr<Expr> tail;                         // 可选末尾值表达式；不存在时为空。
 };
 
 }  // namespace rx::ast

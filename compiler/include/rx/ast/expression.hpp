@@ -61,9 +61,9 @@ struct BlockExpr final : Expr {
 struct IfExpr final : Expr {
     IfExpr();
     [[nodiscard]] AstChildren children() const override;
-    std::unique_ptr<Expr> condition;               // if 后的条件表达式子树。
+    std::shared_ptr<Expr> condition;               // if 后的条件表达式子树。
     Block then_block;                              // 条件成立时执行的代码块。
-    std::unique_ptr<Expr> else_branch;              // 可选 else 块或 else if 子树；没有 else 时为空。
+    std::shared_ptr<Expr> else_branch;              // 可选 else 块或 else if 子树；没有 else 时为空。
 };
 
 // while 循环表达式节点，继承 Expr；对应 WHILE conditionExpression blockExpression。
@@ -71,7 +71,7 @@ struct IfExpr final : Expr {
 struct WhileExpr final : Expr {
     WhileExpr();
     [[nodiscard]] AstChildren children() const override;
-    std::unique_ptr<Expr> condition;               // while 条件表达式子树。
+    std::shared_ptr<Expr> condition;               // while 条件表达式子树。
     Block body;                                    // 循环体代码块。
 };
 
@@ -88,7 +88,7 @@ struct LoopExpr final : Expr {
 struct BreakExpr final : Expr {
     BreakExpr();
     [[nodiscard]] AstChildren children() const override;
-    std::unique_ptr<Expr> value;                   // 可选的退出值表达式子树。
+    std::shared_ptr<Expr> value;                   // 可选的退出值表达式子树。
 };
 
 // continue 表达式节点，继承 Expr；对应 CONTINUE，没有额外语法值。
@@ -102,7 +102,7 @@ struct ContinueExpr final : Expr {
 struct ReturnExpr final : Expr {
     ReturnExpr();
     [[nodiscard]] AstChildren children() const override;
-    std::unique_ptr<Expr> value;                   // 可选的返回值表达式子树。
+    std::shared_ptr<Expr> value;                   // 可选的返回值表达式子树。
 };
 
 // 一元运算表达式节点，继承 Expr；对应 unaryOperator unaryExpression。
@@ -111,7 +111,7 @@ struct UnaryExpr final : Expr {
     UnaryExpr();
     [[nodiscard]] AstChildren children() const override;
     UnaryOperator op = UnaryOperator::Not;         // 负号、非、解引用或借用等一元运算符。
-    std::unique_ptr<Expr> operand;                  // 运算符作用的表达式子树。
+    std::shared_ptr<Expr> operand;                  // 运算符作用的表达式子树。
 };
 
 // 二元运算表达式节点，继承 Expr；由各级二元运算语法规则折叠得到。
@@ -120,8 +120,8 @@ struct BinaryExpr final : Expr {
     BinaryExpr();
     [[nodiscard]] AstChildren children() const override;
     BinaryOperator op = BinaryOperator::Add;       // 加减、比较、逻辑、位运算等二元运算符。
-    std::unique_ptr<Expr> left;                     // 左操作数子树。
-    std::unique_ptr<Expr> right;                    // 右操作数子树。
+    std::shared_ptr<Expr> left;                     // 左操作数子树。
+    std::shared_ptr<Expr> right;                    // 右操作数子树。
 };
 
 // 赋值表达式节点，继承 Expr；对应 assignmentExpression 及其赋值运算符。
@@ -130,8 +130,8 @@ struct AssignmentExpr final : Expr {
     AssignmentExpr();
     [[nodiscard]] AstChildren children() const override;
     AssignmentOperator op = AssignmentOperator::Assign; // =、+=、<<= 等赋值运算符。
-    std::unique_ptr<Expr> place;                         // 左侧目标表达式子树。
-    std::unique_ptr<Expr> value;                         // 右侧值表达式子树。
+    std::shared_ptr<Expr> place;                         // 左侧目标表达式子树。
+    std::shared_ptr<Expr> value;                         // 右侧值表达式子树。
 };
 
 // 类型转换表达式节点，继承 Expr；对应 expression AS typeRef。
@@ -139,7 +139,7 @@ struct AssignmentExpr final : Expr {
 struct CastExpr final : Expr {
     CastExpr();
     [[nodiscard]] AstChildren children() const override;
-    std::unique_ptr<Expr> value;                   // as 左侧表达式子树。
+    std::shared_ptr<Expr> value;                   // as 左侧表达式子树。
     TypeSyntax target_type;                        // as 右侧目标类型。
 };
 
@@ -148,8 +148,8 @@ struct CastExpr final : Expr {
 struct CallExpr final : Expr {
     CallExpr();
     [[nodiscard]] AstChildren children() const override;
-    std::unique_ptr<Expr> callee;                   // 函数名/可调用表达式子树。
-    std::vector<std::unique_ptr<Expr>> arguments;   // 圆括号内的实参子树列表。
+    std::shared_ptr<Expr> callee;                   // 函数名/可调用表达式子树。
+    std::vector<std::shared_ptr<Expr>> arguments;   // 圆括号内的实参子树列表。
 };
 
 // 方法调用节点，继承 Expr；对应 dotSuffix 中“接收者.方法名(实参)”形式。
@@ -157,9 +157,9 @@ struct CallExpr final : Expr {
 struct MethodCallExpr final : Expr {
     MethodCallExpr();
     [[nodiscard]] AstChildren children() const override;
-    std::unique_ptr<Expr> receiver;                 // 点号左侧的接收者表达式子树。
+    std::shared_ptr<Expr> receiver;                 // 点号左侧的接收者表达式子树。
     PathSegment method;                             // 点号右侧的方法名及可选泛型实参。
-    std::vector<std::unique_ptr<Expr>> arguments;   // 方法调用的实参列表。
+    std::vector<std::shared_ptr<Expr>> arguments;   // 方法调用的实参列表。
 };
 
 // 字段访问节点，继承 Expr；对应 dotSuffix 中“表达式.字段名”形式。
@@ -167,7 +167,7 @@ struct MethodCallExpr final : Expr {
 struct FieldAccessExpr final : Expr {
     FieldAccessExpr();
     [[nodiscard]] AstChildren children() const override;
-    std::unique_ptr<Expr> base;                     // 被访问字段所属的对象表达式子树。
+    std::shared_ptr<Expr> base;                     // 被访问字段所属的对象表达式子树。
     std::string field;                              // 点号后的字段名。
 };
 
@@ -176,8 +176,8 @@ struct FieldAccessExpr final : Expr {
 struct IndexExpr final : Expr {
     IndexExpr();
     [[nodiscard]] AstChildren children() const override;
-    std::unique_ptr<Expr> base;                     // 数组或其他可下标对象的表达式子树。
-    std::unique_ptr<Expr> index;                    // 方括号中的下标表达式子树。
+    std::shared_ptr<Expr> base;                     // 数组或其他可下标对象的表达式子树。
+    std::shared_ptr<Expr> index;                    // 方括号中的下标表达式子树。
 };
 
 // 数组列表节点，继承 Expr；对应 arrayExpression 中逗号分隔的元素形式。
@@ -185,7 +185,7 @@ struct IndexExpr final : Expr {
 struct ArrayListExpr final : Expr {
     ArrayListExpr();
     [[nodiscard]] AstChildren children() const override;
-    std::vector<std::unique_ptr<Expr>> elements;    // 方括号中的数组元素列表。
+    std::vector<std::shared_ptr<Expr>> elements;    // 方括号中的数组元素列表。
 };
 
 // 重复元素数组节点，继承 Expr；对应 arrayExpression 的 [expression; constValue] 形式。
@@ -193,7 +193,7 @@ struct ArrayListExpr final : Expr {
 struct ArrayRepeatExpr final : Expr {
     ArrayRepeatExpr();
     [[nodiscard]] AstChildren children() const override;
-    std::unique_ptr<Expr> element;                  // 要重复放入数组的元素表达式。
+    std::shared_ptr<Expr> element;                  // 要重复放入数组的元素表达式。
     ConstValueSyntax count;                         // 数组长度常量语法。
 };
 
@@ -208,7 +208,7 @@ struct StructInitializerField final : AstNode {
     StructInitializerField& operator=(const StructInitializerField&) = delete;
     [[nodiscard]] AstChildren children() const override;
     std::string name;                               // 初始化的字段名。
-    std::unique_ptr<Expr> value;                    // 冒号后的字段值表达式子树。
+    std::shared_ptr<Expr> value;                    // 冒号后的字段值表达式子树。
 };
 
 // 结构体初始化表达式节点，继承 Expr；对应 pathInExpression 后跟 { structExprFields }。

@@ -166,7 +166,7 @@ struct ConstantItem final : Item {
 struct AssociatedItem final : AstNode {
     AssociatedItem();
     [[nodiscard]] AstChildren children() const override;
-    std::variant<std::unique_ptr<FunctionItem>, std::unique_ptr<ConstantItem>> value; // 被拥有的函数或常量。
+    std::variant<std::shared_ptr<FunctionItem>, std::shared_ptr<ConstantItem>> value; // 被拥有的函数或常量。
 };
 
 // inherent impl 块节点，继承抽象 Item；对应 inherentImpl 规则。
