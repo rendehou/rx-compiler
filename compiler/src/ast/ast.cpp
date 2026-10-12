@@ -50,7 +50,11 @@ AstChildren UseTree::children() const {
 }
 
 UseItem::UseItem() : Item(NodeKind::UseItem) {}
-AstChildren UseItem::children() const { return {&tree}; }
+AstChildren UseItem::children() const {
+    AstChildren result;
+    appendChild(result, tree);
+    return result;
+}
 
 FunctionItem::FunctionItem() : Item(NodeKind::FunctionItem) {}
 AstChildren FunctionItem::children() const {
@@ -65,7 +69,11 @@ AstChildren FunctionItem::children() const {
 }
 
 StructField::StructField() : AstNode(NodeKind::StructField) {}
-AstChildren StructField::children() const { return {&type}; }
+AstChildren StructField::children() const {
+    AstChildren result;
+    appendChild(result, type);
+    return result;
+}
 
 DeriveAttribute::DeriveAttribute() : AstNode(NodeKind::DeriveAttribute) {}
 AstChildren DeriveAttribute::children() const { return {}; }
@@ -81,14 +89,19 @@ AstChildren StructItem::children() const {
 }
 
 ConstantItem::ConstantItem() : Item(NodeKind::ConstantItem) {}
-AstChildren ConstantItem::children() const { return {&type, &initializer}; }
+AstChildren ConstantItem::children() const {
+    AstChildren result;
+    appendChild(result, type);
+    appendChild(result, initializer);
+    return result;
+}
 
 AssociatedItem::AssociatedItem() : AstNode(NodeKind::AssociatedItem) {}
 AstChildren AssociatedItem::children() const {
     AstChildren result;
-    if (const auto* function = std::get_if<std::unique_ptr<FunctionItem>>(&value)) {
+    if (const auto* function = std::get_if<std::shared_ptr<FunctionItem>>(&value)) {
         appendChild(result, *function);
-    } else if (const auto* constant = std::get_if<std::unique_ptr<ConstantItem>>(&value)) {
+    } else if (const auto* constant = std::get_if<std::shared_ptr<ConstantItem>>(&value)) {
         appendChild(result, *constant);
     }
     return result;
@@ -145,10 +158,18 @@ UnitExpr::UnitExpr() : Expr(NodeKind::UnitExpr) {}
 AstChildren UnitExpr::children() const { return {}; }
 
 PathExpr::PathExpr() : Expr(NodeKind::PathExpr) {}
-AstChildren PathExpr::children() const { return {&path}; }
+AstChildren PathExpr::children() const {
+    AstChildren result;
+    appendChild(result, path);
+    return result;
+}
 
 BlockExpr::BlockExpr() : Expr(NodeKind::BlockExpr) {}
-AstChildren BlockExpr::children() const { return {&block}; }
+AstChildren BlockExpr::children() const {
+    AstChildren result;
+    appendChild(result, block);
+    return result;
+}
 
 IfExpr::IfExpr() : Expr(NodeKind::IfExpr) {}
 AstChildren IfExpr::children() const {
@@ -168,7 +189,11 @@ AstChildren WhileExpr::children() const {
 }
 
 LoopExpr::LoopExpr() : Expr(NodeKind::LoopExpr) {}
-AstChildren LoopExpr::children() const { return {&body}; }
+AstChildren LoopExpr::children() const {
+    AstChildren result;
+    appendChild(result, body);
+    return result;
+}
 
 BreakExpr::BreakExpr() : Expr(NodeKind::BreakExpr) {}
 AstChildren BreakExpr::children() const {
@@ -267,8 +292,6 @@ AstChildren ArrayRepeatExpr::children() const {
 
 StructInitializerField::StructInitializerField() : AstNode(NodeKind::StructInitializerField) {}
 StructInitializerField::~StructInitializerField() = default;
-StructInitializerField::StructInitializerField(StructInitializerField&&) noexcept = default;
-StructInitializerField& StructInitializerField::operator=(StructInitializerField&&) noexcept = default;
 AstChildren StructInitializerField::children() const {
     AstChildren result;
     appendChild(result, value);
@@ -285,8 +308,6 @@ AstChildren StructInitExpr::children() const {
 
 PathSegment::PathSegment() : AstNode(NodeKind::PathSegment) {}
 PathSegment::~PathSegment() = default;
-PathSegment::PathSegment(PathSegment&&) noexcept = default;
-PathSegment& PathSegment::operator=(PathSegment&&) noexcept = default;
 AstChildren PathSegment::children() const {
     AstChildren result;
     appendChildren(result, generic_arguments);
@@ -302,8 +323,6 @@ AstChildren Path::children() const {
 
 ConstValueSyntax::ConstValueSyntax() : AstNode(NodeKind::ConstValueSyntax) {}
 ConstValueSyntax::~ConstValueSyntax() = default;
-ConstValueSyntax::ConstValueSyntax(ConstValueSyntax&&) noexcept = default;
-ConstValueSyntax& ConstValueSyntax::operator=(ConstValueSyntax&&) noexcept = default;
 AstChildren ConstValueSyntax::children() const {
     AstChildren result;
     if (kind == ConstValueKind::Path) appendChild(result, path);
@@ -313,8 +332,6 @@ AstChildren ConstValueSyntax::children() const {
 
 TypeSyntax::TypeSyntax() : AstNode(NodeKind::TypeSyntax) {}
 TypeSyntax::~TypeSyntax() = default;
-TypeSyntax::TypeSyntax(TypeSyntax&&) noexcept = default;
-TypeSyntax& TypeSyntax::operator=(TypeSyntax&&) noexcept = default;
 AstChildren TypeSyntax::children() const {
     AstChildren result;
     switch (kind) {
@@ -336,8 +353,9 @@ AstChildren TypeSyntax::children() const {
 
 GenericArgumentSyntax::GenericArgumentSyntax() : AstNode(NodeKind::GenericArgumentSyntax) {}
 AstChildren GenericArgumentSyntax::children() const {
-    if (kind == GenericArgumentKind::Type) return {&type};
-    return {};
+    AstChildren result;
+    if (kind == GenericArgumentKind::Type) appendChild(result, type);
+    return result;
 }
 
 AstChildren Program::children() const {

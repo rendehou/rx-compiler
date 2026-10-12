@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -36,7 +35,7 @@ struct LetStatement final : Statement {
     [[nodiscard]] AstChildren children() const override;
     std::string name;                              // 被声明的变量名。
     bool mutable_binding = false;                 // 绑定是否写了 mut。
-    std::optional<TypeSyntax> declared_type;       // 可选冒号类型；未显式标注时为空。
+    std::shared_ptr<TypeSyntax> declared_type;    // 可选冒号类型；未显式标注时为空。
     std::shared_ptr<Expr> initializer;             // 等号后的初始化表达式，拥有该子树。
 };
 

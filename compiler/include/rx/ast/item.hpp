@@ -26,8 +26,8 @@ struct LifetimeParameter final : AstNode {
 struct GenericParameters final : AstNode {
     GenericParameters();
     [[nodiscard]] AstChildren children() const override;
-    bool written = false;                           // 源码是否显式写了尖括号泛型列表。
-    std::vector<LifetimeParameter> lifetimes;       // 尖括号内的生命周期参数。
+    bool written = false;                                      // 源码是否显式写了尖括号泛型列表。
+    std::vector<std::shared_ptr<LifetimeParameter>> lifetimes; // 尖括号内的生命周期参数。
 };
 
 // where 子句中的单条约束，直接继承 AstNode；对应 whereClauseItem 规则的两种形式。
@@ -35,10 +35,10 @@ struct GenericParameters final : AstNode {
 struct WherePredicate final : AstNode {
     WherePredicate();
     [[nodiscard]] AstChildren children() const override;
-    bool subject_is_lifetime = false;               // true 表示主体是生命周期，否则是类型。
-    std::string lifetime_subject;                   // 生命周期形式的主体，例如 'a。
-    std::optional<TypeSyntax> type_subject;         // 类型形式的主体，例如 T。
-    std::vector<std::string> lifetime_bounds;       // 冒号右侧的生命周期边界。
+    bool subject_is_lifetime = false;                    // true 表示主体是生命周期，否则是类型。
+    std::string lifetime_subject;                        // 生命周期形式的主体，例如 'a。
+    std::shared_ptr<TypeSyntax> type_subject;            // 类型形式的主体，例如 T；为空表示主体是生命周期。
+    std::vector<std::string> lifetime_bounds;            // 冒号右侧的生命周期边界。
 };
 
 // where 子句节点，直接继承 AstNode；对应 whereClause 规则。
@@ -46,8 +46,8 @@ struct WherePredicate final : AstNode {
 struct WhereClause final : AstNode {
     WhereClause();
     [[nodiscard]] AstChildren children() const override;
-    bool written = false;                           // 源码中是否出现 where。
-    std::vector<WherePredicate> predicates;         // where 后面的约束，保持源码顺序。
+    bool written = false;                                      // 源码中是否出现 where。
+    std::vector<std::shared_ptr<WherePredicate>> predicates;   // where 后面的约束，保持源码顺序。
 };
 
 // 普通函数参数节点，直接继承 AstNode；对应 functionParam 规则。
@@ -57,7 +57,7 @@ struct FunctionParameter final : AstNode {
     [[nodiscard]] AstChildren children() const override;
     std::string name;                               // 参数绑定名。
     bool mutable_binding = false;                  // 参数绑定是否带 mut。
-    TypeSyntax type;                               // 冒号后的参数类型语法。
+    std::shared_ptr<TypeSyntax> type;              // 冒号后的参数类型语法。
 };
 
 // self 接收者的具体形式；这是取值标签，不是 AST 节点基类。
@@ -89,12 +89,12 @@ enum class UseTreeKind { Path, Glob, Group };
 struct UseTree final : AstNode {
     UseTree();
     [[nodiscard]] AstChildren children() const override;
-    UseTreeKind form = UseTreeKind::Path;          // 当前是普通路径、* 通配符还是 {...} 分组。
-    bool leading_separator = false;                // 路径前是否有开头的 ::。
-    std::vector<std::string> prefix;                // ::、* 或分组之前的路径段。
-    std::optional<std::string> alias;               // as 后的别名；没有 as 时为空。
-    bool alias_is_underscore = false;               // 别名是否显式写成 _。
-    std::vector<UseTree> group_items;                // 花括号内递归嵌套的 useTree 子项。
+    UseTreeKind form = UseTreeKind::Path;                    // 当前是普通路径、* 通配符还是 {...} 分组。
+    bool leading_separator = false;                          // 路径前是否有开头的 ::。
+    std::vector<std::string> prefix;                         // ::、* 或分组之前的路径段。
+    std::optional<std::string> alias;                        // as 后的别名；没有 as 时为空。
+    bool alias_is_underscore = false;                        // 别名是否显式写成 _。
+    std::vector<std::shared_ptr<UseTree>> group_items;       // 花括号内递归嵌套的 useTree 子项。
 };
 
 // use 声明节点，继承抽象 Item；对应 useDeclaration 规则。
@@ -102,7 +102,7 @@ struct UseTree final : AstNode {
 struct UseItem final : Item {
     UseItem();
     [[nodiscard]] AstChildren children() const override;
-    UseTree tree;                                   // use 后的导入路径/分组结构。
+    std::shared_ptr<UseTree> tree;                 // use 后的导入路径/分组结构。
 };
 
 // 函数定义节点，继承抽象 Item；对应 functionDefinition 规则。
@@ -110,13 +110,13 @@ struct UseItem final : Item {
 struct FunctionItem final : Item {
     FunctionItem();
     [[nodiscard]] AstChildren children() const override;
-    std::string name;                               // 函数名。
-    std::shared_ptr<GenericParameters> generic_parameters;           // 可选的泛型生命周期参数列表。
-    std::shared_ptr<Receiver> receiver;                // impl 方法可选的 self 接收者。
-    std::vector<std::shared_ptr<FunctionParameter>> parameters;      // 普通参数列表，按源码顺序。
-    std::shared_ptr<TypeSyntax> return_type;           // 显式 -> 后的返回类型；未写箭头时为空。
-    WhereClause where_clause;                       // 可选 where 子句。
-    Block body;                                     // 函数体 blockExpression。
+    std::string name;                                             // 函数名。
+    std::shared_ptr<GenericParameters> generic_parameters;        // 可选的泛型生命周期参数列表。
+    std::shared_ptr<Receiver> receiver;                            // impl 方法可选的 self 接收者。
+    std::vector<std::shared_ptr<FunctionParameter>> parameters;   // 普通参数列表，按源码顺序。
+    std::shared_ptr<TypeSyntax> return_type;                       // 显式 -> 后的返回类型；未写箭头时为空。
+    std::shared_ptr<WhereClause> where_clause;                     // 可选 where 子句。
+    std::shared_ptr<Block> body;                                   // 函数体 blockExpression。
 };
 
 // 结构体字段节点，直接继承 AstNode；对应 structField 规则。
@@ -125,7 +125,7 @@ struct StructField final : AstNode {
     StructField();
     [[nodiscard]] AstChildren children() const override;
     std::string name;                               // 字段名。
-    TypeSyntax type;                               // 字段类型。
+    std::shared_ptr<TypeSyntax> type;              // 字段类型。
 };
 
 // derive 属性可出现的 trait 名称；作为 DeriveAttribute 内的枚举值保存。
@@ -144,11 +144,11 @@ struct DeriveAttribute final : AstNode {
 struct StructItem final : Item {
     StructItem();
     [[nodiscard]] AstChildren children() const override;
-    std::string name;                               // 结构体名称。
-    GenericParameters generic_parameters;           // 泛型生命周期参数。
-    WhereClause where_clause;                       // 可选 where 子句。
-    std::vector<DeriveAttribute> attributes;        // struct 前面的外部属性，目前是 derive。
-    std::vector<StructField> fields;                // 花括号内的字段列表。
+    std::string name;                                           // 结构体名称。
+    std::shared_ptr<GenericParameters> generic_parameters;      // 泛型生命周期参数。
+    std::shared_ptr<WhereClause> where_clause;                  // 可选 where 子句。
+    std::vector<std::shared_ptr<DeriveAttribute>> attributes;   // struct 前面的外部属性，目前是 derive。
+    std::vector<std::shared_ptr<StructField>> fields;           // 花括号内的字段列表。
 };
 
 // 常量定义节点，继承抽象 Item；对应 constantItem 规则。
@@ -157,8 +157,8 @@ struct ConstantItem final : Item {
     ConstantItem();
     [[nodiscard]] AstChildren children() const override;
     std::string name;                               // const 后的常量名。
-    TypeSyntax type;                               // 冒号后的显式类型。
-    ConstValueSyntax initializer;                  // 等号后的常量值语法。
+    std::shared_ptr<TypeSyntax> type;              // 冒号后的显式类型。
+    std::shared_ptr<ConstValueSyntax> initializer; // 等号后的常量值语法。
 };
 
 // impl 内的一项成员节点，直接继承 AstNode；对应 associatedItem 规则。
@@ -174,10 +174,10 @@ struct AssociatedItem final : AstNode {
 struct ImplItem final : Item {
     ImplItem();
     [[nodiscard]] AstChildren children() const override;
-    GenericParameters generic_parameters;            // impl 前的泛型生命周期参数。
-    TypeSyntax target_type;                          // impl 所针对的类型。
-    WhereClause where_clause;                       // 可选 where 子句。
-    std::vector<AssociatedItem> items;              // impl 花括号中的成员，按源码顺序。
+    std::shared_ptr<GenericParameters> generic_parameters;     // impl 前的泛型生命周期参数。
+    std::shared_ptr<TypeSyntax> target_type;                   // impl 所针对的类型。
+    std::shared_ptr<WhereClause> where_clause;                 // 可选 where 子句。
+    std::vector<std::shared_ptr<AssociatedItem>> items;        // impl 花括号中的成员，按源码顺序。
 };
 
 }  // namespace rx::ast
