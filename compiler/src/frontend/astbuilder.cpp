@@ -315,5 +315,460 @@ namespace rx::frontend {
         }
         return std::static_pointer_cast<ast::AstNode>(where);
     }
-    
+
+    std::any AstBuilder::visitWhereClauseItem(
+        Parser::WhereClauseItemContext* ctx
+    ) {
+        auto predicate = std::make_shared<ast::WherePredicate>();
+
+        if (ctx->lifetime()) {//lifetime bound
+            predicate->subject_is_lifetime = true;
+            predicate->lifetime_subject = ctx->lifetime()->getText();
+
+            if (auto* bounds = ctx->lifetimeBounds()) {
+                for (auto* boundCtx : bounds->lifetime()) {
+                    predicate->lifetime_bounds.push_back(
+                        boundCtx->getText()
+                    );
+                }
+            }
+        } else {//都在是typeparam
+            predicate->subject_is_lifetime = false;
+
+            predicate->type_subject = asNode<ast::TypeSyntax>(
+                visit(ctx->typeRef())
+            );
+
+            if (auto* bounds = ctx->typeParamBounds()) {
+                for (auto* boundCtx : bounds->lifetime()) {
+                    predicate->lifetime_bounds.push_back(
+                        boundCtx->getText()
+                    );
+                }
+            }
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            predicate
+        );
+    }
+
+
+    std::any AstBuilder::visitStructField(
+        Parser::StructFieldContext* ctx
+    ) {
+        auto field = std::make_shared<ast::StructField>();
+
+        field->name = ctx->identifier()->getText();
+
+        field->type = asNode<ast::TypeSyntax>(
+            visit(ctx->typeRef())
+        );
+
+        return std::static_pointer_cast<ast::AstNode>(
+            field
+        );
+    }
+
+    std::any AstBuilder::visitOuterAttribute(
+        Parser::OuterAttributeContext* ctx
+    ) {
+        auto attribute = std::make_shared<ast::DeriveAttribute>();
+
+        for (auto* deriveCtx : ctx->deriveName()) {
+            std::string name = deriveCtx->getText();
+
+            if (name == "Copy") {
+                attribute->traits.push_back(ast::DeriveTrait::Copy);
+            } else if (name == "Clone") {
+                attribute->traits.push_back(ast::DeriveTrait::Clone);
+            } else if (name == "PartialEq") {
+                attribute->traits.push_back(ast::DeriveTrait::PartialEq);
+            } else if (name == "Eq") {
+                attribute->traits.push_back(ast::DeriveTrait::Eq);
+            }
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            attribute
+        );
+    }
+
+    std::any AstBuilder::visitAssociatedItem(
+        Parser::AssociatedItemContext* ctx
+    ) {
+        auto item = std::make_shared<ast::AssociatedItem>();
+
+        if (ctx->functionDefinition()) {
+            item->value = asNode<ast::FunctionItem>(
+                visit(ctx->functionDefinition())
+            );
+        } else {
+            item->value = asNode<ast::ConstantItem>(
+                visit(ctx->constantItem())
+            );
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            item
+        );
+    }
+
+    //下面的是第三部分，type和path
+    std::any AstBuilder::visitTypeRef(
+        Parser::TypeRefContext* ctx
+    ) {
+        if (ctx->LPAREN()) {//判断左括号分类
+
+            //(type)形
+            if (ctx->typeRef()) {
+                return visit(ctx->typeRef());
+            }
+
+            //空括号
+            auto type = std::make_shared<ast::TypeSyntax>();
+            type->kind = ast::TypeSyntaxKind::Unit;
+
+            return std::static_pointer_cast<ast::AstNode>(
+                type
+            );
+        }
+
+        if (ctx->typePath()) {//没有括号会很三类，讨论一下
+            auto type = std::make_shared<ast::TypeSyntax>();
+            type->kind = ast::TypeSyntaxKind::Path;
+            type->path = asNode<ast::Path>(
+                visit(ctx->typePath())
+            );
+
+            return std::static_pointer_cast<ast::AstNode>(
+                type
+            );
+        }
+
+        if (ctx->referenceType()) {
+            return visit(ctx->referenceType());
+        }
+
+        return visit(ctx->arrayType());
+    }
+
+
+    std::any AstBuilder::visitReferenceType(//引用类型
+        Parser::ReferenceTypeContext* ctx
+    ) {
+        auto type = std::make_shared<ast::TypeSyntax>();
+
+        type->kind = ast::TypeSyntaxKind::Reference;
+        type->mutable_reference = ctx->MUT() != nullptr;
+
+        if (ctx->lifetime()) {
+            type->lifetime = ctx->lifetime()->getText();
+        }
+
+        type->referent = asNode<ast::TypeSyntax>(
+            visit(ctx->typeRef())
+        );
+
+        // &&T在语法上表示两层引用
+        if (ctx->ANDAND()) {
+            auto outer = std::make_shared<ast::TypeSyntax>();
+
+            outer->kind = ast::TypeSyntaxKind::Reference;
+            outer->referent = type;
+
+            return std::static_pointer_cast<ast::AstNode>(
+                outer
+            );
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            type
+        );
+    }
+
+
+    std::any AstBuilder::visitArrayType(
+        Parser::ArrayTypeContext* ctx
+    ) {
+        auto type = std::make_shared<ast::TypeSyntax>();
+
+        type->kind = ast::TypeSyntaxKind::Array;
+
+        type->array_element = asNode<ast::TypeSyntax>(
+            visit(ctx->typeRef())
+        );
+
+        type->length = asNode<ast::ConstValueSyntax>(
+            visit(ctx->constValue())
+        );
+
+        return std::static_pointer_cast<ast::AstNode>(type);
+    }
+
+
+    std::any AstBuilder::visitTypePath(
+        Parser::TypePathContext* ctx
+    ) {
+        auto path = std::make_shared<ast::Path>();
+
+        for (auto* segmentCtx : ctx->typePathSegment()) {
+            path->segments.push_back(
+                asNode<ast::PathSegment>(
+                    visit(segmentCtx)
+                )
+            );
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            path
+        );
+    }
+
+
+    std::any AstBuilder::visitTypePathSegment(//路径的一段
+        Parser::TypePathSegmentContext* ctx
+    ) {
+        auto segment = std::make_shared<ast::PathSegment>();
+
+        segment->name = ctx->pathIdentSegment()->getText();
+
+        if (auto* arguments = ctx->genericArgs()) {//如果后面有泛型参数
+            for (auto* argumentCtx : arguments->genericArg()) {
+                segment->generic_arguments.push_back(
+                    asNode<ast::GenericArgumentSyntax>(
+                        visit(argumentCtx)
+                    )
+                );
+            }
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            segment
+        );
+    }
+
+
+    std::any AstBuilder::visitPathInExpression(//一整条路径
+        Parser::PathInExpressionContext* ctx
+    ) {
+        auto path = std::make_shared<ast::Path>();
+
+        for (auto* segmentCtx : ctx->pathExprSegment()) {
+            path->segments.push_back(
+                asNode<ast::PathSegment>(
+                    visit(segmentCtx)
+                )
+            );
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            path
+        );
+    }
+
+
+    std::any AstBuilder::visitPathExprSegment(//表达式版本的
+        Parser::PathExprSegmentContext* ctx
+    ) {
+        auto segment = std::make_shared<ast::PathSegment>();
+
+        segment->name = ctx->pathIdentSegment()->getText();
+
+        if (auto* arguments = ctx->genericArgs()) {
+            for (auto* argumentCtx : arguments->genericArg()) {
+                segment->generic_arguments.push_back(
+                    asNode<ast::GenericArgumentSyntax>(
+                        visit(argumentCtx)
+                    )
+                );
+            }
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            segment
+        );
+    }
+
+
+    std::any AstBuilder::visitGenericArg(
+        Parser::GenericArgContext* ctx
+    ) {
+        auto argument = std::make_shared<ast::GenericArgumentSyntax>();
+
+        if (ctx->lifetime()) {
+            argument->kind = ast::GenericArgumentKind::Lifetime;
+            argument->lifetime = ctx->lifetime()->getText();
+        } else {
+            argument->kind = ast::GenericArgumentKind::Type;
+
+            argument->type = asNode<ast::TypeSyntax>(
+                visit(ctx->typeRef())
+            );
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            argument
+        );
+    }
+
+
+    std::any AstBuilder::visitClosedCastType(//用来处理歧义
+        Parser::ClosedCastTypeContext* ctx
+    ) {
+
+        //()或者(type)
+        if (ctx->LPAREN()) {
+            if (ctx->typeRef()) {
+                return visit(ctx->typeRef());
+            }
+
+            auto type = std::make_shared<ast::TypeSyntax>();
+            type->kind = ast::TypeSyntaxKind::Unit;
+
+            return std::static_pointer_cast<ast::AstNode>(
+                type
+            );
+        }
+
+        if (ctx->arrayType()) {
+            return visit(ctx->arrayType());
+        }
+
+        //引用类型
+        if (ctx->closedCastType()) {
+            auto type = std::make_shared<ast::TypeSyntax>();
+
+            type->kind = ast::TypeSyntaxKind::Reference;
+            type->mutable_reference = ctx->MUT() != nullptr;
+
+            if (ctx->lifetime()) {
+                type->lifetime = ctx->lifetime()->getText();
+            }
+
+            type->referent = asNode<ast::TypeSyntax>(
+                visit(ctx->closedCastType())
+            );
+
+            if (ctx->ANDAND()) {
+                auto outer = std::make_shared<ast::TypeSyntax>();
+
+                outer->kind = ast::TypeSyntaxKind::Reference;
+                outer->referent = type;
+
+                return std::static_pointer_cast<ast::AstNode>(
+                    outer
+                );
+            }
+
+            return std::static_pointer_cast<ast::AstNode>(
+                type
+            );
+        }
+
+        // 最后一种情况是带显式泛型参数的path
+        auto path = std::make_shared<ast::Path>();
+
+        for (auto* segmentCtx : ctx->typePathSegment()) {
+            path->segments.push_back(
+                asNode<ast::PathSegment>(
+                    visit(segmentCtx)
+                )
+            );
+        }
+
+        auto lastSegment = std::make_shared<ast::PathSegment>();
+        lastSegment->name = ctx->pathIdentSegment()->getText();
+
+        for (auto* argumentCtx : ctx->genericArgs()->genericArg()) {
+            lastSegment->generic_arguments.push_back(
+                asNode<ast::GenericArgumentSyntax>(
+                    visit(argumentCtx)
+                )
+            );
+        }
+
+        path->segments.push_back(lastSegment);
+
+        auto type = std::make_shared<ast::TypeSyntax>();
+        type->kind = ast::TypeSyntaxKind::Path;
+        type->path = path;
+
+        return std::static_pointer_cast<ast::AstNode>(
+            type
+        );
+    }
+
+
+    std::any AstBuilder::visitConstValue(
+        Parser::ConstValueContext* ctx
+    ) {
+
+        if (ctx->INTEGER_LITERAL()) {
+            auto value = std::make_shared<ast::ConstValueSyntax>();
+
+            value->kind = ast::ConstValueKind::Integer;
+            value->integer_spelling = ctx->INTEGER_LITERAL()->getText();
+
+            return std::static_pointer_cast<ast::AstNode>(
+                value
+            );
+        }
+
+        if (ctx->TRUE() || ctx->FALSE()) {
+            auto value = std::make_shared<ast::ConstValueSyntax>();
+
+            value->kind = ast::ConstValueKind::Boolean;
+            value->boolean_value = ctx->TRUE() != nullptr;
+
+            return std::static_pointer_cast<ast::AstNode>(
+                value
+            );
+        }
+
+        if (ctx->pathInExpression()) {
+            auto value = std::make_shared<ast::ConstValueSyntax>();
+
+            value->kind = ast::ConstValueKind::Path;
+            value->path = asNode<ast::Path>(
+                visit(ctx->pathInExpression())
+            );
+
+            return std::static_pointer_cast<ast::AstNode>(
+                value
+            );
+        }
+
+        if (ctx->MINUS()) {
+            auto value = std::make_shared<ast::ConstValueSyntax>();
+            value->kind = ast::ConstValueKind::Negate;
+
+            auto* magnitude = ctx->magnitude();
+
+            while (magnitude->magnitude()) {
+                magnitude = magnitude->magnitude();
+            }
+
+            auto operand = std::make_shared<ast::ConstValueSyntax>();
+
+            if (magnitude->INTEGER_LITERAL()) {
+                operand->kind = ast::ConstValueKind::Integer;
+                operand->integer_spelling = magnitude->INTEGER_LITERAL()->getText();
+            } else {
+                operand->kind = ast::ConstValueKind::Path;
+                operand->path = asNode<ast::Path>(
+                    visit(magnitude->pathInExpression())
+                );
+            }
+
+            value->operand = operand;
+
+            return std::static_pointer_cast<ast::AstNode>(
+                value
+            );
+        }
+
+        //括号不会出现在AST中
+        return visit(ctx->constValue());
+    }
 }
