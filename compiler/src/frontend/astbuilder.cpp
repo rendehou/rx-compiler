@@ -1,6 +1,13 @@
 #include "rx/frontend/astbuilder.hpp"
 
 #include "rx/ast/item.hpp"
+#include "rx/ast/expression.hpp"
+#include "rx/ast/statement.hpp"
+#include "rx/ast/operator.hpp"
+#include "rx/ast/node.hpp"
+#include "rx/ast/program.hpp"
+#include "rx/ast/type_syntax.hpp"
+#include "rx/ast/source_span.hpp"
 
 namespace rx::frontend {
 
@@ -770,5 +777,141 @@ namespace rx::frontend {
 
         //括号不会出现在AST中
         return visit(ctx->constValue());
+    }
+
+    //blockand statement
+    std::any AstBuilder::visitBlockExpression(
+        Parser::BlockExpressionContext* ctx
+    ) {
+        auto block = std::make_shared<ast::Block>();
+
+        for (auto* statementCtx : ctx->statement()) {
+            block->statements.push_back(
+                asNode<ast::Statement>(
+                    visit(statementCtx)
+                )
+            );
+        }
+
+        if (ctx->statementExpression()) {//块尾指令
+            block->tail = asNode<ast::Expr>(
+                visit(ctx->statementExpression())
+            );
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            block
+        );
+    }
+
+    std::any AstBuilder::visitStatement(
+        Parser::StatementContext* ctx
+    ) {
+
+        // 空语句
+        if (!ctx->letStatement()
+            && !ctx->expressionWithBlock()
+            && !ctx->statementExpression()) {
+
+            auto statement = std::make_shared<ast::EmptyStatement>();
+
+            return std::static_pointer_cast<ast::AstNode>(
+                statement
+            );
+        }
+
+        if (ctx->letStatement()) {
+            return visit(ctx->letStatement());
+        }
+
+        auto statement = std::make_shared<ast::ExpressionStatement>();
+
+        if (ctx->expressionWithBlock()) {
+            statement->expression = asNode<ast::Expr>(
+                visit(ctx->expressionWithBlock())
+            );
+
+            statement->has_semicolon = ctx->SEMI() != nullptr;
+        } else {
+            statement->expression = asNode<ast::Expr>(
+                visit(ctx->statementExpression())
+            );
+
+            statement->has_semicolon = true;
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            statement
+        );
+    }
+
+    std::any AstBuilder::visitLetStatement(
+        Parser::LetStatementContext* ctx
+    ) {
+        auto statement = std::make_shared<ast::LetStatement>();
+
+        statement->name = ctx->identifierBinding()->identifier()->getText();
+        statement->mutable_binding = ctx->identifierBinding()->MUT() != nullptr;
+
+        if (ctx->typeRef()) {
+            statement->declared_type = asNode<ast::TypeSyntax>(
+                visit(ctx->typeRef())
+            );
+        }
+
+        statement->initializer = asNode<ast::Expr>(
+            visit(ctx->expression())
+        );
+
+        return std::static_pointer_cast<ast::AstNode>(
+            statement
+        );
+    }
+
+     std::any AstBuilder::visitExpressionWithBlock(
+        Parser::ExpressionWithBlockContext* ctx
+    ) {
+
+        if (ctx->blockExpression() && !ctx->LOOP() && !ctx->WHILE()) {
+            auto expression = std::make_shared<ast::BlockExpr>();
+
+            expression->block = asNode<ast::Block>(
+                visit(ctx->blockExpression())
+            );
+
+            return std::static_pointer_cast<ast::AstNode>(
+                expression
+            );
+        }
+
+        if (ctx->ifExpression()) {
+            return visit(ctx->ifExpression());
+        }
+
+        if (ctx->LOOP()) {
+            auto expression = std::make_shared<ast::LoopExpr>();
+
+            expression->body = asNode<ast::Block>(
+                visit(ctx->blockExpression())
+            );
+
+            return std::static_pointer_cast<ast::AstNode>(
+                expression
+            );
+        }
+
+        auto expression = std::make_shared<ast::WhileExpr>();
+
+        expression->condition = asNode<ast::Expr>(
+            visit(ctx->conditionExpression())
+        );
+
+        expression->body = asNode<ast::Block>(
+            visit(ctx->blockExpression())
+        );
+
+        return std::static_pointer_cast<ast::AstNode>(
+            expression
+        );
     }
 }
