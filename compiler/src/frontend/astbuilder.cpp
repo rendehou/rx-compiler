@@ -1462,4 +1462,236 @@ namespace rx::frontend {
         );
     }
 
+
+    std::any AstBuilder::visitNonBlockPrimary(//最终处理最小的式子
+        Parser::NonBlockPrimaryContext* ctx
+    ) {
+
+        if (ctx->literalExpression()) {
+            return visit(ctx->literalExpression());
+        }
+
+        // path或者结构体初始化
+        if (ctx->pathInExpression()) {
+            auto path = asNode<ast::Path>(
+                visit(ctx->pathInExpression())
+            );
+
+            if (ctx->LBRACE()) {
+                auto expression = std::make_shared<ast::StructInitExpr>();
+
+                expression->path = path;
+
+                if (ctx->structExprFields()) {
+                    for (auto* fieldCtx : ctx->structExprFields()->structExprField()) {
+                        expression->fields.push_back(
+                            asNode<ast::StructInitializerField>(
+                                visit(fieldCtx)
+                            )
+                        );
+                    }
+                }
+
+                return std::static_pointer_cast<ast::AstNode>(
+                    expression
+                );
+            }
+
+            auto expression = std::make_shared<ast::PathExpr>();
+            expression->path = path;
+
+            return std::static_pointer_cast<ast::AstNode>(
+                expression
+            );
+        }
+
+        // 括号表达式或者()
+        if (ctx->LPAREN()) {
+
+            if (ctx->expression()) {
+                return visit(ctx->expression());
+            }
+
+            auto expression = std::make_shared<ast::UnitExpr>();
+
+            return std::static_pointer_cast<ast::AstNode>(
+                expression
+            );
+        }
+
+        if (ctx->arrayExpression()) {//array
+            return visit(ctx->arrayExpression());
+        }
+
+        if (ctx->BREAK()) {//break
+            auto expression = std::make_shared<ast::BreakExpr>();
+
+            if (ctx->expression()) {
+                expression->value = asNode<ast::Expr>(
+                    visit(ctx->expression())
+                );
+            }
+
+            return std::static_pointer_cast<ast::AstNode>(
+                expression
+            );
+        }
+
+        if (ctx->RETURN()) {//return
+            auto expression = std::make_shared<ast::ReturnExpr>();
+
+            if (ctx->expression()) {
+                expression->value = asNode<ast::Expr>(
+                    visit(ctx->expression())
+                );
+            }
+
+            return std::static_pointer_cast<ast::AstNode>(
+                expression
+            );
+        }
+
+        auto expression = std::make_shared<ast::ContinueExpr>();
+
+        return std::static_pointer_cast<ast::AstNode>(
+            expression
+        );
+    }
+    std::any AstBuilder::visitLiteralExpression(//字面表达式，如数字
+        Parser::LiteralExpressionContext* ctx
+    ) {
+
+        if (ctx->INTEGER_LITERAL()) {
+            auto expression = std::make_shared<ast::IntegerExpr>();
+
+            expression->spelling = ctx->INTEGER_LITERAL()->getText();
+
+            return std::static_pointer_cast<ast::AstNode>(
+                expression
+            );
+        }
+
+        auto expression = std::make_shared<ast::BooleanExpr>();
+
+        expression->value = ctx->TRUE() != nullptr;
+
+        return std::static_pointer_cast<ast::AstNode>(
+            expression
+        );
+    }
+
+
+    std::any AstBuilder::visitArrayExpression(
+        Parser::ArrayExpressionContext* ctx
+    ) {
+        auto expressions = ctx->expression();
+
+        //[x;n] n个相同的x
+        if (ctx->constValue()) {
+            auto array = std::make_shared<ast::ArrayRepeatExpr>();
+
+            array->element = asNode<ast::Expr>(
+                visit(expressions[0])
+            );
+
+            array->count = asNode<ast::ConstValueSyntax>(
+                visit(ctx->constValue())
+            );
+
+            return std::static_pointer_cast<ast::AstNode>(
+                array
+            );
+        }
+
+        // [a, b, c]，逐个列出
+        auto array = std::make_shared<ast::ArrayListExpr>();
+
+        for (auto* expressionCtx : expressions) {
+            array->elements.push_back(
+                asNode<ast::Expr>(
+                    visit(expressionCtx)
+                )
+            );
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            array
+        );
+    }
+
+    std::any AstBuilder::visitStructExprField(
+        Parser::StructExprFieldContext* ctx
+    ) {
+            auto field = std::make_shared<ast::StructInitializerField>();
+
+            field->name = ctx->identifier()->getText();
+
+            field->value = asNode<ast::Expr>(
+                visit(ctx->expression())
+            );
+
+            return std::static_pointer_cast<ast::AstNode>(
+                field
+            );
+        }
+
+        // use与别名
+
+    std::any AstBuilder::visitUseTree(//路径树,需要讨论::的个数
+        Parser::UseTreeContext* ctx
+    ) {
+        auto tree = std::make_shared<ast::UseTree>();
+
+        if (auto* path = ctx->usePath()) {
+
+            //如果PATHSEP数量和segment数量相同，说明最前面还有一个::
+            if (path->PATHSEP().size() == path->usePathSegment().size()) {
+                tree->leading_separator = true;
+            }
+
+            for (auto* segmentCtx : path->usePathSegment()) {
+                tree->prefix.push_back(
+                    segmentCtx->getText()
+                );
+            }
+        } else if (ctx->PATHSEP()) {
+            // 例如use ::*;
+            tree->leading_separator = true;
+        }
+
+        //
+        if (ctx->STAR()) {
+            tree->form = ast::UseTreeKind::Glob;
+            return std::static_pointer_cast<ast::AstNode>(tree);
+        }
+
+        // 分组
+        if (ctx->LBRACE()) {
+            tree->form = ast::UseTreeKind::Group;
+
+            for (auto* itemCtx : ctx->useTree()) {
+                tree->group_items.push_back(
+                    asNode<ast::UseTree>(
+                        visit(itemCtx)
+                    )
+                );
+            }
+
+            return std::static_pointer_cast<ast::AstNode>(tree);
+        }
+
+        // 普通path
+        tree->form = ast::UseTreeKind::Path;
+
+        if (ctx->AS()) {
+            if (ctx->UNDERSCORE()) {
+                tree->alias = "_";
+                tree->alias_is_underscore = true;
+            } else {
+                tree->alias = ctx->identifier()->getText();
+            }
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(tree);
+    }
 }
