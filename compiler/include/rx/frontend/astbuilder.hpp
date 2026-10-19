@@ -229,6 +229,119 @@ public:
         Parser::UseTreeContext* ctx
     ) override;
 
+    
+    
+    //接下来是一些语法细节
+    //这些函数用于消除< 与 <<的歧义
+    std::any visitClosedBitOrExpression(
+        Parser::ClosedBitOrExpressionContext* ctx
+    ) override;
+
+    std::any visitClosedBitXorExpression(
+        Parser::ClosedBitXorExpressionContext* ctx
+    ) override;
+
+    std::any visitClosedBitAndExpression(
+        Parser::ClosedBitAndExpressionContext* ctx
+    ) override;
+
+    std::any visitClosedShiftExpression(
+        Parser::ClosedShiftExpressionContext* ctx
+    ) override;
+
+    std::any visitClosedAdditiveExpression(
+        Parser::ClosedAdditiveExpressionContext* ctx
+    ) override;
+
+    std::any visitClosedMultiplicativeExpression(
+        Parser::ClosedMultiplicativeExpressionContext* ctx
+    ) override;
+
+    std::any visitClosedCastExpression(
+        Parser::ClosedCastExpressionContext* ctx
+    ) override;
+
+
+    // statement expression   
+    std::any visitStatementAssignmentExpression(
+        Parser::StatementAssignmentExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementLogicalOrExpression(
+        Parser::StatementLogicalOrExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementLogicalAndExpression(
+        Parser::StatementLogicalAndExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementComparisonExpression(
+        Parser::StatementComparisonExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementBitOrExpression(
+        Parser::StatementBitOrExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementClosedBitOrExpression(
+        Parser::StatementClosedBitOrExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementBitXorExpression(
+        Parser::StatementBitXorExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementClosedBitXorExpression(
+        Parser::StatementClosedBitXorExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementBitAndExpression(
+        Parser::StatementBitAndExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementClosedBitAndExpression(
+        Parser::StatementClosedBitAndExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementShiftExpression(
+        Parser::StatementShiftExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementClosedShiftExpression(
+        Parser::StatementClosedShiftExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementAdditiveExpression(
+        Parser::StatementAdditiveExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementClosedAdditiveExpression(
+        Parser::StatementClosedAdditiveExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementMultiplicativeExpression(
+        Parser::StatementMultiplicativeExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementClosedMultiplicativeExpression(
+        Parser::StatementClosedMultiplicativeExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementCastExpression(
+        Parser::StatementCastExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementClosedCastExpression(
+        Parser::StatementClosedCastExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementUnaryExpression(
+        Parser::StatementUnaryExpressionContext* ctx
+    ) override;
+
+    std::any visitStatementPostfixExpression(
+        Parser::StatementPostfixExpressionContext* ctx
+    ) override;
 
 private:
     //这是类型转换函数，使用的时候是asNode（实际想要的类）
