@@ -262,7 +262,7 @@ public:
     ) override;
 
 
-    // statement expression   
+    // statement expression ,本质是给块首语句上标记，用于消除{}后没有分号的歧义。判定过程和普通expression层层进相同
     std::any visitStatementAssignmentExpression(
         Parser::StatementAssignmentExpressionContext* ctx
     ) override;
@@ -342,7 +342,95 @@ public:
     std::any visitStatementPostfixExpression(
         Parser::StatementPostfixExpressionContext* ctx
     ) override;
+    
+    //condition，消除歧义，
+    std::any visitConditionAssignmentExpression(
+        Parser::ConditionAssignmentExpressionContext* ctx
+    ) override;
 
+    std::any visitConditionLogicalOrExpression(
+        Parser::ConditionLogicalOrExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionLogicalAndExpression(
+        Parser::ConditionLogicalAndExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionComparisonExpression(
+        Parser::ConditionComparisonExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionBitOrExpression(
+        Parser::ConditionBitOrExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionClosedBitOrExpression(
+        Parser::ConditionClosedBitOrExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionBitXorExpression(
+        Parser::ConditionBitXorExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionClosedBitXorExpression(
+        Parser::ConditionClosedBitXorExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionBitAndExpression(
+        Parser::ConditionBitAndExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionClosedBitAndExpression(
+        Parser::ConditionClosedBitAndExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionShiftExpression(
+        Parser::ConditionShiftExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionClosedShiftExpression(
+        Parser::ConditionClosedShiftExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionAdditiveExpression(
+        Parser::ConditionAdditiveExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionClosedAdditiveExpression(
+        Parser::ConditionClosedAdditiveExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionMultiplicativeExpression(
+        Parser::ConditionMultiplicativeExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionClosedMultiplicativeExpression(
+        Parser::ConditionClosedMultiplicativeExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionCastExpression(
+        Parser::ConditionCastExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionClosedCastExpression(
+        Parser::ConditionClosedCastExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionUnaryExpression(
+        Parser::ConditionUnaryExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionPostfixExpression(
+        Parser::ConditionPostfixExpressionContext* ctx
+    ) override;
+
+    std::any visitConditionPrimary(
+        Parser::ConditionPrimaryContext* ctx
+    ) override;
+
+    std::any visitConditionPrimaryWithoutBareBlock(
+        Parser::ConditionPrimaryWithoutBareBlockContext* ctx
+    ) override;
 private:
     //这是类型转换函数，使用的时候是asNode（实际想要的类）
     template <typename T>

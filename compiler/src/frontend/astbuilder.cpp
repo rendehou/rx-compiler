@@ -2799,7 +2799,7 @@ namespace rx::frontend {
     }
 
 
-    //condition
+    //condition主要区分if后面遇到{}的歧义。if + 类 + {}会被识别成if的then语句，给类初始化要加括号
     std::any AstBuilder::visitConditionAssignmentExpression(
         Parser::ConditionAssignmentExpressionContext* ctx
     ) {
