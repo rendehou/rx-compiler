@@ -3,9 +3,11 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include "rx/ast/type_syntax.hpp"
 
 namespace rx::semantic {
 
+    
     enum class TypeKind {
         //具体类型
         I32,
@@ -21,7 +23,7 @@ namespace rx::semantic {
         Array,
         Box,
         Vec,
-        Error
+        Error//各种不匹配时
     };
 
     struct Type {
@@ -73,7 +75,10 @@ namespace rx::semantic {
         bool operator==(const Type& other) const;
         bool operator!=(const Type& other) const;
 
-        
+        Type resolveType(//类型转换，把ast的类型转换成自然类型
+            const std::shared_ptr<rx::ast::TypeSyntax>& syntax,
+            const std::string& self_type = ""
+        );
     };
 
 } // namespace rx::semantic
