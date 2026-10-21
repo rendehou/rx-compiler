@@ -2,7 +2,7 @@
 
 #include <utility>
 
-namespace rx::semantic {
+namespace rx::semantic {//type负责声明用到的所有类型。
 
     Type::Type(TypeKind kind) : kind(kind) {}
 
