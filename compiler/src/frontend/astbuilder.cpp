@@ -3713,5 +3713,804 @@ namespace rx::frontend {
         );
     }
 
-    
+        std::any AstBuilder::visitConditionBreakAssignmentExpression(
+        Parser::ConditionBreakAssignmentExpressionContext* ctx
+    ) {
+        auto left = asNode<ast::Expr>(
+            visit(ctx->conditionBreakLogicalOrExpression())
+        );
+
+        if (!ctx->assignmentOperator()) {
+            return std::static_pointer_cast<ast::AstNode>(left);
+        }
+
+        auto expression = std::make_shared<ast::AssignmentExpr>();
+
+        std::string op = ctx->assignmentOperator()->getText();
+
+        if (op == "=") {
+            expression->op = ast::AssignmentOperator::Assign;
+        } else if (op == "+=") {
+            expression->op = ast::AssignmentOperator::Add;
+        } else if (op == "-=") {
+            expression->op = ast::AssignmentOperator::Subtract;
+        } else if (op == "*=") {
+            expression->op = ast::AssignmentOperator::Multiply;
+        } else if (op == "/=") {
+            expression->op = ast::AssignmentOperator::Divide;
+        } else if (op == "%=") {
+            expression->op = ast::AssignmentOperator::Remainder;
+        } else if (op == "&=") {
+            expression->op = ast::AssignmentOperator::BitAnd;
+        } else if (op == "|=") {
+            expression->op = ast::AssignmentOperator::BitOr;
+        } else if (op == "^=") {
+            expression->op = ast::AssignmentOperator::BitXor;
+        } else if (op == "<<=") {
+            expression->op = ast::AssignmentOperator::ShiftLeft;
+        } else if (op == ">>=") {
+            expression->op = ast::AssignmentOperator::ShiftRight;
+        }
+
+        expression->place = left;
+
+        expression->value = asNode<ast::Expr>(
+            visit(ctx->conditionExpression())
+        );
+
+        return std::static_pointer_cast<ast::AstNode>(
+            expression
+        );
+    }
+
+
+    std::any AstBuilder::visitConditionBreakLogicalOrExpression(
+        Parser::ConditionBreakLogicalOrExpressionContext* ctx
+    ) {
+        auto expressions = ctx->conditionLogicalAndExpression();
+
+        auto result = asNode<ast::Expr>(
+            visit(ctx->conditionBreakLogicalAndExpression())
+        );
+
+        for (size_t i = 0; i < expressions.size(); ++i) {
+            auto binary = std::make_shared<ast::BinaryExpr>();
+
+            binary->op = ast::BinaryOperator::LogicalOr;
+            binary->left = result;
+            binary->right = asNode<ast::Expr>(
+                visit(expressions[i])
+            );
+
+            result = binary;
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            result
+        );
+    }
+
+
+    std::any AstBuilder::visitConditionBreakLogicalAndExpression(
+        Parser::ConditionBreakLogicalAndExpressionContext* ctx
+    ) {
+        auto expressions = ctx->conditionComparisonExpression();
+
+        auto result = asNode<ast::Expr>(
+            visit(ctx->conditionBreakComparisonExpression())
+        );
+
+        for (size_t i = 0; i < expressions.size(); ++i) {
+            auto binary = std::make_shared<ast::BinaryExpr>();
+
+            binary->op = ast::BinaryOperator::LogicalAnd;
+            binary->left = result;
+            binary->right = asNode<ast::Expr>(
+                visit(expressions[i])
+            );
+
+            result = binary;
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            result
+        );
+    }
+
+
+    std::any AstBuilder::visitConditionBreakComparisonExpression(
+        Parser::ConditionBreakComparisonExpressionContext* ctx
+    ) {
+        std::shared_ptr<ast::Expr> left;
+        std::shared_ptr<ast::Expr> right;
+        std::string op;
+
+        if (ctx->conditionBreakClosedBitOrExpression()) {
+            left = asNode<ast::Expr>(
+                visit(ctx->conditionBreakClosedBitOrExpression())
+            );
+
+            right = asNode<ast::Expr>(
+                visit(ctx->conditionBitOrExpression())
+            );
+
+            op = "<";
+        } else {
+            left = asNode<ast::Expr>(
+                visit(ctx->conditionBreakBitOrExpression())
+            );
+
+            if (!ctx->comparisonExceptLt()) {
+                return std::static_pointer_cast<ast::AstNode>(
+                    left
+                );
+            }
+
+            right = asNode<ast::Expr>(
+                visit(ctx->conditionBitOrExpression())
+            );
+
+            op = ctx->comparisonExceptLt()->getText();
+        }
+
+        auto binary = std::make_shared<ast::BinaryExpr>();
+
+        if (op == "==") {
+            binary->op = ast::BinaryOperator::Equal;
+        } else if (op == "!=") {
+            binary->op = ast::BinaryOperator::NotEqual;
+        } else if (op == "<") {
+            binary->op = ast::BinaryOperator::Less;
+        } else if (op == "<=") {
+            binary->op = ast::BinaryOperator::LessEqual;
+        } else if (op == ">") {
+            binary->op = ast::BinaryOperator::Greater;
+        } else {
+            binary->op = ast::BinaryOperator::GreaterEqual;
+        }
+
+        binary->left = left;
+        binary->right = right;
+
+        return std::static_pointer_cast<ast::AstNode>(
+            binary
+        );
+    }
+
+    std::any AstBuilder::visitConditionBreakBitOrExpression(
+        Parser::ConditionBreakBitOrExpressionContext* ctx
+    ) {
+        auto expressions = ctx->conditionBitXorExpression();
+
+        auto result = asNode<ast::Expr>(
+            visit(ctx->conditionBreakBitXorExpression())
+        );
+
+        for (size_t i = 0; i < expressions.size(); ++i) {
+            auto binary = std::make_shared<ast::BinaryExpr>();
+
+            binary->op = ast::BinaryOperator::BitOr;
+            binary->left = result;
+            binary->right = asNode<ast::Expr>(
+                visit(expressions[i])
+            );
+
+            result = binary;
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            result
+        );
+    }
+
+
+    std::any AstBuilder::visitConditionBreakClosedBitOrExpression(
+        Parser::ConditionBreakClosedBitOrExpressionContext* ctx
+    ) {
+        auto expressions = ctx->conditionBitXorExpression();
+
+        if (ctx->conditionBreakClosedBitXorExpression()) {
+            return visit(ctx->conditionBreakClosedBitXorExpression());
+        }
+
+        auto result = asNode<ast::Expr>(
+            visit(ctx->conditionBreakBitXorExpression())
+        );
+
+        for (size_t i = 0; i < expressions.size(); ++i) {
+            auto binary = std::make_shared<ast::BinaryExpr>();
+
+            binary->op = ast::BinaryOperator::BitOr;
+            binary->left = result;
+            binary->right = asNode<ast::Expr>(
+                visit(expressions[i])
+            );
+
+            result = binary;
+        }
+
+        auto binary = std::make_shared<ast::BinaryExpr>();
+
+        binary->op = ast::BinaryOperator::BitOr;
+        binary->left = result;
+        binary->right = asNode<ast::Expr>(
+            visit(ctx->conditionClosedBitXorExpression())
+        );
+
+        return std::static_pointer_cast<ast::AstNode>(binary);
+    }
+
+
+    std::any AstBuilder::visitConditionBreakBitXorExpression(
+        Parser::ConditionBreakBitXorExpressionContext* ctx
+    ) {
+        auto expressions = ctx->conditionBitAndExpression();
+
+        auto result = asNode<ast::Expr>(
+            visit(ctx->conditionBreakBitAndExpression())
+        );
+
+        for (size_t i = 0; i < expressions.size(); ++i) {
+            auto binary = std::make_shared<ast::BinaryExpr>();
+
+            binary->op = ast::BinaryOperator::BitXor;
+            binary->left = result;
+            binary->right = asNode<ast::Expr>(
+                visit(expressions[i])
+            );
+
+            result = binary;
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            result
+        );
+    }
+
+
+    std::any AstBuilder::visitConditionBreakClosedBitXorExpression(
+        Parser::ConditionBreakClosedBitXorExpressionContext* ctx
+    ) {
+        auto expressions = ctx->conditionBitAndExpression();
+
+        if (ctx->conditionBreakClosedBitAndExpression()) {
+            return visit(ctx->conditionBreakClosedBitAndExpression());
+        }
+
+        auto result = asNode<ast::Expr>(
+            visit(ctx->conditionBreakBitAndExpression())
+        );
+
+        for (size_t i = 0; i < expressions.size(); ++i) {
+            auto binary = std::make_shared<ast::BinaryExpr>();
+
+            binary->op = ast::BinaryOperator::BitXor;
+            binary->left = result;
+            binary->right = asNode<ast::Expr>(
+                visit(expressions[i])
+            );
+
+            result = binary;
+        }
+
+        auto binary = std::make_shared<ast::BinaryExpr>();
+
+        binary->op = ast::BinaryOperator::BitXor;
+        binary->left = result;
+        binary->right = asNode<ast::Expr>(
+            visit(ctx->conditionClosedBitAndExpression())
+        );
+
+        return std::static_pointer_cast<ast::AstNode>(binary);
+    }
+
+    std::any AstBuilder::visitConditionBreakBitAndExpression(
+        Parser::ConditionBreakBitAndExpressionContext* ctx
+    ) {
+        auto expressions = ctx->conditionShiftExpression();
+
+        auto result = asNode<ast::Expr>(
+            visit(ctx->conditionBreakShiftExpression())
+        );
+
+        for (size_t i = 0; i < expressions.size(); ++i) {
+            auto binary = std::make_shared<ast::BinaryExpr>();
+
+            binary->op = ast::BinaryOperator::BitAnd;
+            binary->left = result;
+            binary->right = asNode<ast::Expr>(
+                visit(expressions[i])
+            );
+
+            result = binary;
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            result
+        );
+    }
+
+
+    std::any AstBuilder::visitConditionBreakClosedBitAndExpression(
+        Parser::ConditionBreakClosedBitAndExpressionContext* ctx
+    ) {
+        auto expressions = ctx->conditionShiftExpression();
+
+        if (ctx->conditionBreakClosedShiftExpression()) {
+            return visit(ctx->conditionBreakClosedShiftExpression());
+        }
+
+        auto result = asNode<ast::Expr>(
+            visit(ctx->conditionBreakShiftExpression())
+        );
+
+        for (size_t i = 0; i < expressions.size(); ++i) {
+            auto binary = std::make_shared<ast::BinaryExpr>();
+
+            binary->op = ast::BinaryOperator::BitAnd;
+            binary->left = result;
+            binary->right = asNode<ast::Expr>(
+                visit(expressions[i])
+            );
+
+            result = binary;
+        }
+
+        auto binary = std::make_shared<ast::BinaryExpr>();
+
+        binary->op = ast::BinaryOperator::BitAnd;
+        binary->left = result;
+        binary->right = asNode<ast::Expr>(
+            visit(ctx->conditionClosedShiftExpression())
+        );
+
+        return std::static_pointer_cast<ast::AstNode>(binary);
+    }
+
+    std::any AstBuilder::visitConditionBreakShiftExpression(
+        Parser::ConditionBreakShiftExpressionContext* ctx
+    ) {
+        std::shared_ptr<ast::Expr> result;
+        std::string op;
+
+        for (auto* child : ctx->children) {
+            std::string text = child->getText();
+
+            if (text == "<<" || text == ">>") {
+                op = text;
+                continue;
+            }
+
+            std::any value = visit(child);
+
+            if (value.type() != typeid(std::shared_ptr<ast::AstNode>)) {
+                continue;
+            }
+
+            auto expression = asNode<ast::Expr>(value);
+
+            if (!expression) {
+                continue;
+            }
+
+            if (!result) {
+                result = expression;
+                continue;
+            }
+
+            auto binary = std::make_shared<ast::BinaryExpr>();
+
+            if (op == "<<") {
+                binary->op = ast::BinaryOperator::ShiftLeft;
+            } else {
+                binary->op = ast::BinaryOperator::ShiftRight;
+            }
+
+            binary->left = result;
+            binary->right = expression;
+            result = binary;
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            result
+        );
+    }
+
+
+    std::any AstBuilder::visitConditionBreakClosedShiftExpression(
+        Parser::ConditionBreakClosedShiftExpressionContext* ctx
+    ) {
+        // conditionBreak 的 closed 版本移位表达式
+
+        std::shared_ptr<ast::Expr> result;
+        std::string op;
+
+        for (auto* child : ctx->children) {
+            std::string text = child->getText();
+
+            if (text == "<<" || text == ">>") {
+                op = text;
+                continue;
+            }
+
+            std::any value = visit(child);
+
+            if (value.type() != typeid(std::shared_ptr<ast::AstNode>)) {
+                continue;
+            }
+
+            auto expression = asNode<ast::Expr>(value);
+
+            if (!expression) {
+                continue;
+            }
+
+            if (!result) {
+                result = expression;
+                continue;
+            }
+
+            auto binary = std::make_shared<ast::BinaryExpr>();
+
+            if (op == "<<") {
+                binary->op = ast::BinaryOperator::ShiftLeft;
+            } else {
+                binary->op = ast::BinaryOperator::ShiftRight;
+            }
+
+            binary->left = result;
+            binary->right = expression;
+
+            result = binary;
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(result);
+    }
+
+    std::any AstBuilder::visitConditionBreakAdditiveExpression(
+        Parser::ConditionBreakAdditiveExpressionContext* ctx
+    ) {
+        auto expressions = ctx->conditionMultiplicativeExpression();
+        auto operators = ctx->additiveOperator();
+
+        auto result = asNode<ast::Expr>(
+            visit(ctx->conditionBreakMultiplicativeExpression())
+        );
+
+        for (size_t i = 0; i < expressions.size(); ++i) {
+            auto binary = std::make_shared<ast::BinaryExpr>();
+
+            if (operators[i]->getText() == "+") {
+                binary->op = ast::BinaryOperator::Add;
+            } else {
+                binary->op = ast::BinaryOperator::Subtract;
+            }
+
+            binary->left = result;
+            binary->right = asNode<ast::Expr>(
+                visit(expressions[i])
+            );
+
+            result = binary;
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            result
+        );
+    }
+
+
+    std::any AstBuilder::visitConditionBreakClosedAdditiveExpression(
+        Parser::ConditionBreakClosedAdditiveExpressionContext* ctx
+    ) {
+        auto expressions = ctx->conditionMultiplicativeExpression();
+        auto operators = ctx->additiveOperator();
+
+        if (ctx->conditionBreakClosedMultiplicativeExpression()) {
+            return visit(ctx->conditionBreakClosedMultiplicativeExpression());
+        }
+
+        auto result = asNode<ast::Expr>(
+            visit(ctx->conditionBreakMultiplicativeExpression())
+        );
+
+        for (size_t i = 0; i < expressions.size(); ++i) {
+            auto binary = std::make_shared<ast::BinaryExpr>();
+
+            if (operators[i]->getText() == "+") {
+                binary->op = ast::BinaryOperator::Add;
+            } else {
+                binary->op = ast::BinaryOperator::Subtract;
+            }
+
+            binary->left = result;
+            binary->right = asNode<ast::Expr>(
+                visit(expressions[i])
+            );
+
+            result = binary;
+        }
+
+        auto binary = std::make_shared<ast::BinaryExpr>();
+
+        if (operators.back()->getText() == "+") {
+            binary->op = ast::BinaryOperator::Add;
+        } else {
+            binary->op = ast::BinaryOperator::Subtract;
+        }
+
+        binary->left = result;
+        binary->right = asNode<ast::Expr>(
+            visit(ctx->conditionClosedMultiplicativeExpression())
+        );
+
+        return std::static_pointer_cast<ast::AstNode>(binary);
+    }
+    std::any AstBuilder::visitConditionBreakMultiplicativeExpression(
+        Parser::ConditionBreakMultiplicativeExpressionContext* ctx
+    ) {
+        auto expressions = ctx->conditionCastExpression();
+        auto operators = ctx->multiplicativeOperator();
+
+        auto result = asNode<ast::Expr>(
+            visit(ctx->conditionBreakCastExpression())
+        );
+
+        for (size_t i = 0; i < expressions.size(); ++i) {
+            auto binary = std::make_shared<ast::BinaryExpr>();
+
+            std::string op = operators[i]->getText();
+
+            if (op == "*") {
+                binary->op = ast::BinaryOperator::Multiply;
+            } else if (op == "/") {
+                binary->op = ast::BinaryOperator::Divide;
+            } else {
+                binary->op = ast::BinaryOperator::Remainder;
+            }
+
+            binary->left = result;
+            binary->right = asNode<ast::Expr>(
+                visit(expressions[i])
+            );
+
+            result = binary;
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            result
+        );
+    }
+
+
+    std::any AstBuilder::visitConditionBreakClosedMultiplicativeExpression(
+        Parser::ConditionBreakClosedMultiplicativeExpressionContext* ctx
+    ) {
+        auto expressions = ctx->conditionCastExpression();
+        auto operators = ctx->multiplicativeOperator();
+
+        if (ctx->conditionBreakClosedCastExpression()) {
+            return visit(ctx->conditionBreakClosedCastExpression());
+        }
+
+        auto result = asNode<ast::Expr>(
+            visit(ctx->conditionBreakCastExpression())
+        );
+
+        for (size_t i = 0; i < expressions.size(); ++i) {
+            auto binary = std::make_shared<ast::BinaryExpr>();
+
+            std::string op = operators[i]->getText();
+
+            if (op == "*") {
+                binary->op = ast::BinaryOperator::Multiply;
+            } else if (op == "/") {
+                binary->op = ast::BinaryOperator::Divide;
+            } else {
+                binary->op = ast::BinaryOperator::Remainder;
+            }
+
+            binary->left = result;
+            binary->right = asNode<ast::Expr>(
+                visit(expressions[i])
+            );
+
+            result = binary;
+        }
+
+        auto binary = std::make_shared<ast::BinaryExpr>();
+
+        std::string op = operators.back()->getText();
+
+        if (op == "*") {
+            binary->op = ast::BinaryOperator::Multiply;
+        } else if (op == "/") {
+            binary->op = ast::BinaryOperator::Divide;
+        } else {
+            binary->op = ast::BinaryOperator::Remainder;
+        }
+
+        binary->left = result;
+        binary->right = asNode<ast::Expr>(
+            visit(ctx->conditionClosedCastExpression())
+        );
+
+        return std::static_pointer_cast<ast::AstNode>(binary);
+    }
+    std::any AstBuilder::visitConditionBreakCastExpression(
+        Parser::ConditionBreakCastExpressionContext* ctx
+    ) {
+        auto result = asNode<ast::Expr>(
+            visit(ctx->conditionBreakUnaryExpression())
+        );
+
+        for (auto* typeCtx : ctx->typeRef()) {
+            auto cast = std::make_shared<ast::CastExpr>();
+
+            cast->value = result;
+            cast->target_type = asNode<ast::TypeSyntax>(
+                visit(typeCtx)
+            );
+
+            result = cast;
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            result
+        );
+    }
+
+
+    std::any AstBuilder::visitConditionBreakClosedCastExpression(
+        Parser::ConditionBreakClosedCastExpressionContext* ctx
+    ) {
+        if (ctx->conditionBreakUnaryExpression()) {
+            return visit(ctx->conditionBreakUnaryExpression());
+        }
+
+        auto expression = std::make_shared<ast::CastExpr>();
+
+        expression->value = asNode<ast::Expr>(
+            visit(ctx->conditionBreakCastExpression())
+        );
+
+        expression->target_type = asNode<ast::TypeSyntax>(
+            visit(ctx->closedCastType())
+        );
+
+        return std::static_pointer_cast<ast::AstNode>(expression);
+    }
+    std::any AstBuilder::visitConditionBreakUnaryExpression(
+        Parser::ConditionBreakUnaryExpressionContext* ctx
+    ) {
+        if (ctx->conditionBreakPostfixExpression()) {
+            return visit(ctx->conditionBreakPostfixExpression());
+        }
+
+        std::string op = ctx->unaryOperator()->getText();
+
+
+        auto operand = asNode<ast::Expr>(
+            visit(ctx->conditionUnaryExpression())
+        );
+
+        // &&x 实际上表示两层借用
+        if (op == "&&" || op == "&&mut") {
+            auto inner = std::make_shared<ast::UnaryExpr>();
+
+            if (op == "&&mut") {
+                inner->op = ast::UnaryOperator::BorrowMutable;
+            } else {
+                inner->op = ast::UnaryOperator::BorrowShared;
+            }
+
+            inner->operand = operand;
+
+            auto outer = std::make_shared<ast::UnaryExpr>();
+            outer->op = ast::UnaryOperator::BorrowShared;
+            outer->operand = inner;
+
+            return std::static_pointer_cast<ast::AstNode>(
+                outer
+            );
+        }
+
+        auto expression = std::make_shared<ast::UnaryExpr>();
+
+        if (op == "-") {
+            expression->op = ast::UnaryOperator::Negate;
+        } else if (op == "!") {
+            expression->op = ast::UnaryOperator::Not;
+        } else if (op == "*") {
+            expression->op = ast::UnaryOperator::Dereference;
+        } else if (op == "&mut") {
+            expression->op = ast::UnaryOperator::BorrowMutable;
+        } else {
+            expression->op = ast::UnaryOperator::BorrowShared;
+        }
+
+        expression->operand = operand;
+
+        return std::static_pointer_cast<ast::AstNode>(
+            expression
+        );
+    }
+
+    // break 值的特殊限制：第一个 primary 不能是裸代码块
+    // 括号中的表达式仍然使用普通 expression，可以包含代码块
+    std::any AstBuilder::visitConditionBreakPostfixExpression(
+        Parser::ConditionBreakPostfixExpressionContext* ctx
+    ) {
+        auto expression = asNode<ast::Expr>(
+            visit(ctx->conditionPrimaryWithoutBareBlock())
+        );
+
+        for (auto* suffixCtx : ctx->postfixSuffix()) {
+
+            // 函数调用
+            if (auto* arguments = suffixCtx->callArguments()) {
+                auto call = std::make_shared<ast::CallExpr>();
+
+                call->callee = expression;
+
+                for (auto* argumentCtx : arguments->expression()) {
+                    call->arguments.push_back(
+                        asNode<ast::Expr>(
+                            visit(argumentCtx)
+                        )
+                    );
+                }
+
+                expression = call;
+                continue;
+            }
+
+            // 数组下标
+            if (suffixCtx->expression()) {
+                auto index = std::make_shared<ast::IndexExpr>();
+
+                index->base = expression;
+                index->index = asNode<ast::Expr>(
+                    visit(suffixCtx->expression())
+                );
+
+                expression = index;
+                continue;
+            }
+
+            auto* dot = suffixCtx->dotSuffix();
+
+            // 方法调用
+            if (dot->callArguments()) {
+                auto method = std::make_shared<ast::MethodCallExpr>();
+
+                method->receiver = expression;
+
+                method->method = asNode<ast::PathSegment>(
+                    visit(dot->pathExprSegment())
+                );
+
+                for (auto* argumentCtx : dot->callArguments()->expression()) {
+                    method->arguments.push_back(
+                        asNode<ast::Expr>(
+                            visit(argumentCtx)
+                        )
+                    );
+                }
+
+                expression = method;
+            } else {
+                auto field = std::make_shared<ast::FieldAccessExpr>();
+
+                field->base = expression;
+                field->field = dot->identifier()->getText();
+
+                expression = field;
+            }
+        }
+
+        return std::static_pointer_cast<ast::AstNode>(
+            expression
+        );
+    }
 }
