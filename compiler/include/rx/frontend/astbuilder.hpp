@@ -3,230 +3,230 @@
 #include <any>
 #include <memory>
 
-#include "ParserBaseVisitor.h"
+#include "RxParserBaseVisitor.h"
 #include "rx/ast/program.hpp"
 
 namespace rx::frontend {
 
-class AstBuilder : public ParserBaseVisitor {
+class AstBuilder : public RxParserBaseVisitor {
 public:
     
     std::shared_ptr<ast::Program>
-    build(Parser::CrateContext* ctx);
+    build(RxParser::CrateContext* ctx);
 
     std::any visitCrate(
-        Parser::CrateContext* ctx
+        RxParser::CrateContext* ctx
     ) override;
 
 
     // 第一部分Item，包括function，struct，const，impl，use
     //这些都先处理最外层的表达式，例如整个function或者整个struct表达式
     std::any visitFunctionDefinition(
-        Parser::FunctionDefinitionContext* ctx
+        RxParser::FunctionDefinitionContext* ctx
     ) override;
 
     std::any visitStructDefinition(
-        Parser::StructDefinitionContext* ctx
+        RxParser::StructDefinitionContext* ctx
     ) override;
 
     std::any visitConstantItem(
-        Parser::ConstantItemContext* ctx
+        RxParser::ConstantItemContext* ctx
     ) override;
 
     std::any visitInherentImpl(
-        Parser::InherentImplContext* ctx
+        RxParser::InherentImplContext* ctx
     ) override;
 
     std::any visitUseDeclaration(
-        Parser::UseDeclarationContext* ctx
+        RxParser::UseDeclarationContext* ctx
     ) override;
 
 
     // 接着的部分，Function / Struct / Impl的内部结构，包括参数，生命周期，等
     std::any visitGenericParams(//泛形参数列表
-        Parser::GenericParamsContext* ctx
+        RxParser::GenericParamsContext* ctx
     ) override;
 
     std::any visitLifetimeParam(//生命周期，不需要处理
-        Parser::LifetimeParamContext* ctx
+        RxParser::LifetimeParamContext* ctx
     ) override;
 
     std::any visitSelfParam(//函数自身，self，mutself等
-        Parser::SelfParamContext* ctx
+        RxParser::SelfParamContext* ctx
     ) override;
 
     std::any visitFunctionParam(//普通参数
-        Parser::FunctionParamContext* ctx
+        RxParser::FunctionParamContext* ctx
     ) override;
 
     std::any visitWhereClause(//where语句
-        Parser::WhereClauseContext* ctx
+        RxParser::WhereClauseContext* ctx
     ) override;
 
     std::any visitWhereClauseItem(//where语句里面的具体约束
-        Parser::WhereClauseItemContext* ctx
+        RxParser::WhereClauseItemContext* ctx
     ) override;
 
     std::any visitStructField(//结构体的一个声明或者字段
-        Parser::StructFieldContext* ctx
+        RxParser::StructFieldContext* ctx
     ) override;
 
     std::any visitOuterAttribute(//外部声明，例如默认derive等
-        Parser::OuterAttributeContext* ctx
+        RxParser::OuterAttributeContext* ctx
     ) override;
 
     std::any visitAssociatedItem(//函数实现impl中的一个实现
-        Parser::AssociatedItemContext* ctx
+        RxParser::AssociatedItemContext* ctx
     ) override;
 
 
     //第三部分，type与path
 
     std::any visitTypeRef(//处理所有的类型，包括括号和其他杂乱格式
-        Parser::TypeRefContext* ctx
+        RxParser::TypeRefContext* ctx
     ) override;
 
     std::any visitReferenceType(//类型引用，是上一个的子函数
-        Parser::ReferenceTypeContext* ctx
+        RxParser::ReferenceTypeContext* ctx
     ) override;
 
     std::any visitArrayType(//数组类型
-        Parser::ArrayTypeContext* ctx
+        RxParser::ArrayTypeContext* ctx
     ) override;
 
     std::any visitTypePath(//类型的完整路径
-        Parser::TypePathContext* ctx
+        RxParser::TypePathContext* ctx
     ) override;
 
     std::any visitTypePathSegment(//是上一个的子函数，操作一个路径
-        Parser::TypePathSegmentContext* ctx
+        RxParser::TypePathSegmentContext* ctx
     ) override;
 
     std::any visitPathInExpression(//处理表达式的完整路径
-        Parser::PathInExpressionContext* ctx
+        RxParser::PathInExpressionContext* ctx
     ) override;
 
     std::any visitPathExprSegment(//类似的，处理表达式路径的单片段
-        Parser::PathExprSegmentContext* ctx
+        RxParser::PathExprSegmentContext* ctx
     ) override;
 
     std::any visitGenericArg(//处理单个泛型,泛型也就是对类设置变量
-        Parser::GenericArgContext* ctx
+        RxParser::GenericArgContext* ctx
     ) override;
 
     std::any visitClosedCastType(//特殊函数，在有两个<<的时候负责说明，消除歧义
-        Parser::ClosedCastTypeContext* ctx
+        RxParser::ClosedCastTypeContext* ctx
     ) override;
 
     std::any visitConstValue(//处理常数值
-        Parser::ConstValueContext* ctx
+        RxParser::ConstValueContext* ctx
     ) override;
 
 
     //block与statement的解析函数
 
     std::any visitBlockExpression(//块表达式
-        Parser::BlockExpressionContext* ctx
+        RxParser::BlockExpressionContext* ctx
     ) override;
 
     std::any visitStatement(//语句表达
-        Parser::StatementContext* ctx
+        RxParser::StatementContext* ctx
     ) override;
 
     std::any visitLetStatement(//let
-        Parser::LetStatementContext* ctx
+        RxParser::LetStatementContext* ctx
     ) override;
 
 
     //block和if的表达式
 
     std::any visitExpressionWithBlock(
-        Parser::ExpressionWithBlockContext* ctx
+        RxParser::ExpressionWithBlockContext* ctx
     ) override;
 
     std::any visitIfExpression(
-        Parser::IfExpressionContext* ctx
+        RxParser::IfExpressionContext* ctx
     ) override;
 
 
     //普通运算表达式，按顺序匹配
 
     std::any visitAssignmentExpression(
-        Parser::AssignmentExpressionContext* ctx
+        RxParser::AssignmentExpressionContext* ctx
     ) override;
 
     std::any visitLogicalOrExpression(
-        Parser::LogicalOrExpressionContext* ctx
+        RxParser::LogicalOrExpressionContext* ctx
     ) override;
 
     std::any visitLogicalAndExpression(
-        Parser::LogicalAndExpressionContext* ctx
+        RxParser::LogicalAndExpressionContext* ctx
     ) override;
 
     std::any visitComparisonExpression(
-        Parser::ComparisonExpressionContext* ctx
+        RxParser::ComparisonExpressionContext* ctx
     ) override;
 
     std::any visitBitOrExpression(
-        Parser::BitOrExpressionContext* ctx
+        RxParser::BitOrExpressionContext* ctx
     ) override;
 
     std::any visitBitXorExpression(
-        Parser::BitXorExpressionContext* ctx
+        RxParser::BitXorExpressionContext* ctx
     ) override;
 
     std::any visitBitAndExpression(
-        Parser::BitAndExpressionContext* ctx
+        RxParser::BitAndExpressionContext* ctx
     ) override;
 
     std::any visitShiftExpression(
-        Parser::ShiftExpressionContext* ctx
+        RxParser::ShiftExpressionContext* ctx
     ) override;
 
     std::any visitAdditiveExpression(
-        Parser::AdditiveExpressionContext* ctx
+        RxParser::AdditiveExpressionContext* ctx
     ) override;
 
     std::any visitMultiplicativeExpression(
-        Parser::MultiplicativeExpressionContext* ctx
+        RxParser::MultiplicativeExpressionContext* ctx
     ) override;
 
     std::any visitCastExpression(
-        Parser::CastExpressionContext* ctx
+        RxParser::CastExpressionContext* ctx
     ) override;
 
     std::any visitUnaryExpression(
-        Parser::UnaryExpressionContext* ctx
+        RxParser::UnaryExpressionContext* ctx
     ) override;
 
     std::any visitPostfixExpression(
-        Parser::PostfixExpressionContext* ctx
+        RxParser::PostfixExpressionContext* ctx
     ) override;
 
 
     //没有块语句的表达式
 
     std::any visitNonBlockPrimary(//非代码块，例如关键字break等，
-        Parser::NonBlockPrimaryContext* ctx
+        RxParser::NonBlockPrimaryContext* ctx
     ) override;
 
     std::any visitLiteralExpression(//字面量
-        Parser::LiteralExpressionContext* ctx
+        RxParser::LiteralExpressionContext* ctx
     ) override;
 
     std::any visitArrayExpression(//数组表达式
-        Parser::ArrayExpressionContext* ctx
+        RxParser::ArrayExpressionContext* ctx
     ) override;
 
     std::any visitStructExprField(//结构体初始化的字段
-        Parser::StructExprFieldContext* ctx
+        RxParser::StructExprFieldContext* ctx
     ) override;
 
 
     //use与别名,与最开始的部分是平行关系
 
     std::any visitUseTree(
-        Parser::UseTreeContext* ctx
+        RxParser::UseTreeContext* ctx
     ) override;
 
     
@@ -234,283 +234,283 @@ public:
     //接下来是一些语法细节
     //这些函数用于消除< 与 <<的歧义
     std::any visitClosedBitOrExpression(
-        Parser::ClosedBitOrExpressionContext* ctx
+        RxParser::ClosedBitOrExpressionContext* ctx
     ) override;
 
     std::any visitClosedBitXorExpression(
-        Parser::ClosedBitXorExpressionContext* ctx
+        RxParser::ClosedBitXorExpressionContext* ctx
     ) override;
 
     std::any visitClosedBitAndExpression(
-        Parser::ClosedBitAndExpressionContext* ctx
+        RxParser::ClosedBitAndExpressionContext* ctx
     ) override;
 
     std::any visitClosedShiftExpression(
-        Parser::ClosedShiftExpressionContext* ctx
+        RxParser::ClosedShiftExpressionContext* ctx
     ) override;
 
     std::any visitClosedAdditiveExpression(
-        Parser::ClosedAdditiveExpressionContext* ctx
+        RxParser::ClosedAdditiveExpressionContext* ctx
     ) override;
 
     std::any visitClosedMultiplicativeExpression(
-        Parser::ClosedMultiplicativeExpressionContext* ctx
+        RxParser::ClosedMultiplicativeExpressionContext* ctx
     ) override;
 
     std::any visitClosedCastExpression(
-        Parser::ClosedCastExpressionContext* ctx
+        RxParser::ClosedCastExpressionContext* ctx
     ) override;
 
 
     // statement expression ,本质是给块首语句上标记，用于消除{}后没有分号的歧义。判定过程和普通expression层层进相同
     std::any visitStatementAssignmentExpression(
-        Parser::StatementAssignmentExpressionContext* ctx
+        RxParser::StatementAssignmentExpressionContext* ctx
     ) override;
 
     std::any visitStatementLogicalOrExpression(
-        Parser::StatementLogicalOrExpressionContext* ctx
+        RxParser::StatementLogicalOrExpressionContext* ctx
     ) override;
 
     std::any visitStatementLogicalAndExpression(
-        Parser::StatementLogicalAndExpressionContext* ctx
+        RxParser::StatementLogicalAndExpressionContext* ctx
     ) override;
 
     std::any visitStatementComparisonExpression(
-        Parser::StatementComparisonExpressionContext* ctx
+        RxParser::StatementComparisonExpressionContext* ctx
     ) override;
 
     std::any visitStatementBitOrExpression(
-        Parser::StatementBitOrExpressionContext* ctx
+        RxParser::StatementBitOrExpressionContext* ctx
     ) override;
 
     std::any visitStatementClosedBitOrExpression(
-        Parser::StatementClosedBitOrExpressionContext* ctx
+        RxParser::StatementClosedBitOrExpressionContext* ctx
     ) override;
 
     std::any visitStatementBitXorExpression(
-        Parser::StatementBitXorExpressionContext* ctx
+        RxParser::StatementBitXorExpressionContext* ctx
     ) override;
 
     std::any visitStatementClosedBitXorExpression(
-        Parser::StatementClosedBitXorExpressionContext* ctx
+        RxParser::StatementClosedBitXorExpressionContext* ctx
     ) override;
 
     std::any visitStatementBitAndExpression(
-        Parser::StatementBitAndExpressionContext* ctx
+        RxParser::StatementBitAndExpressionContext* ctx
     ) override;
 
     std::any visitStatementClosedBitAndExpression(
-        Parser::StatementClosedBitAndExpressionContext* ctx
+        RxParser::StatementClosedBitAndExpressionContext* ctx
     ) override;
 
     std::any visitStatementShiftExpression(
-        Parser::StatementShiftExpressionContext* ctx
+        RxParser::StatementShiftExpressionContext* ctx
     ) override;
 
     std::any visitStatementClosedShiftExpression(
-        Parser::StatementClosedShiftExpressionContext* ctx
+        RxParser::StatementClosedShiftExpressionContext* ctx
     ) override;
 
     std::any visitStatementAdditiveExpression(
-        Parser::StatementAdditiveExpressionContext* ctx
+        RxParser::StatementAdditiveExpressionContext* ctx
     ) override;
 
     std::any visitStatementClosedAdditiveExpression(
-        Parser::StatementClosedAdditiveExpressionContext* ctx
+        RxParser::StatementClosedAdditiveExpressionContext* ctx
     ) override;
 
     std::any visitStatementMultiplicativeExpression(
-        Parser::StatementMultiplicativeExpressionContext* ctx
+        RxParser::StatementMultiplicativeExpressionContext* ctx
     ) override;
 
     std::any visitStatementClosedMultiplicativeExpression(
-        Parser::StatementClosedMultiplicativeExpressionContext* ctx
+        RxParser::StatementClosedMultiplicativeExpressionContext* ctx
     ) override;
 
     std::any visitStatementCastExpression(
-        Parser::StatementCastExpressionContext* ctx
+        RxParser::StatementCastExpressionContext* ctx
     ) override;
 
     std::any visitStatementClosedCastExpression(
-        Parser::StatementClosedCastExpressionContext* ctx
+        RxParser::StatementClosedCastExpressionContext* ctx
     ) override;
 
     std::any visitStatementUnaryExpression(
-        Parser::StatementUnaryExpressionContext* ctx
+        RxParser::StatementUnaryExpressionContext* ctx
     ) override;
 
     std::any visitStatementPostfixExpression(
-        Parser::StatementPostfixExpressionContext* ctx
+        RxParser::StatementPostfixExpressionContext* ctx
     ) override;
     
     //condition，消除歧义，
     std::any visitConditionAssignmentExpression(
-        Parser::ConditionAssignmentExpressionContext* ctx
+        RxParser::ConditionAssignmentExpressionContext* ctx
     ) override;
 
     std::any visitConditionLogicalOrExpression(
-        Parser::ConditionLogicalOrExpressionContext* ctx
+        RxParser::ConditionLogicalOrExpressionContext* ctx
     ) override;
 
     std::any visitConditionLogicalAndExpression(
-        Parser::ConditionLogicalAndExpressionContext* ctx
+        RxParser::ConditionLogicalAndExpressionContext* ctx
     ) override;
 
     std::any visitConditionComparisonExpression(
-        Parser::ConditionComparisonExpressionContext* ctx
+        RxParser::ConditionComparisonExpressionContext* ctx
     ) override;
 
     std::any visitConditionBitOrExpression(
-        Parser::ConditionBitOrExpressionContext* ctx
+        RxParser::ConditionBitOrExpressionContext* ctx
     ) override;
 
     std::any visitConditionClosedBitOrExpression(
-        Parser::ConditionClosedBitOrExpressionContext* ctx
+        RxParser::ConditionClosedBitOrExpressionContext* ctx
     ) override;
 
     std::any visitConditionBitXorExpression(
-        Parser::ConditionBitXorExpressionContext* ctx
+        RxParser::ConditionBitXorExpressionContext* ctx
     ) override;
 
     std::any visitConditionClosedBitXorExpression(
-        Parser::ConditionClosedBitXorExpressionContext* ctx
+        RxParser::ConditionClosedBitXorExpressionContext* ctx
     ) override;
 
     std::any visitConditionBitAndExpression(
-        Parser::ConditionBitAndExpressionContext* ctx
+        RxParser::ConditionBitAndExpressionContext* ctx
     ) override;
 
     std::any visitConditionClosedBitAndExpression(
-        Parser::ConditionClosedBitAndExpressionContext* ctx
+        RxParser::ConditionClosedBitAndExpressionContext* ctx
     ) override;
 
     std::any visitConditionShiftExpression(
-        Parser::ConditionShiftExpressionContext* ctx
+        RxParser::ConditionShiftExpressionContext* ctx
     ) override;
 
     std::any visitConditionClosedShiftExpression(
-        Parser::ConditionClosedShiftExpressionContext* ctx
+        RxParser::ConditionClosedShiftExpressionContext* ctx
     ) override;
 
     std::any visitConditionAdditiveExpression(
-        Parser::ConditionAdditiveExpressionContext* ctx
+        RxParser::ConditionAdditiveExpressionContext* ctx
     ) override;
 
     std::any visitConditionClosedAdditiveExpression(
-        Parser::ConditionClosedAdditiveExpressionContext* ctx
+        RxParser::ConditionClosedAdditiveExpressionContext* ctx
     ) override;
 
     std::any visitConditionMultiplicativeExpression(
-        Parser::ConditionMultiplicativeExpressionContext* ctx
+        RxParser::ConditionMultiplicativeExpressionContext* ctx
     ) override;
 
     std::any visitConditionClosedMultiplicativeExpression(
-        Parser::ConditionClosedMultiplicativeExpressionContext* ctx
+        RxParser::ConditionClosedMultiplicativeExpressionContext* ctx
     ) override;
 
     std::any visitConditionCastExpression(
-        Parser::ConditionCastExpressionContext* ctx
+        RxParser::ConditionCastExpressionContext* ctx
     ) override;
 
     std::any visitConditionClosedCastExpression(
-        Parser::ConditionClosedCastExpressionContext* ctx
+        RxParser::ConditionClosedCastExpressionContext* ctx
     ) override;
 
     std::any visitConditionUnaryExpression(
-        Parser::ConditionUnaryExpressionContext* ctx
+        RxParser::ConditionUnaryExpressionContext* ctx
     ) override;
 
     std::any visitConditionPostfixExpression(
-        Parser::ConditionPostfixExpressionContext* ctx
+        RxParser::ConditionPostfixExpressionContext* ctx
     ) override;
 
     std::any visitConditionPrimary(
-        Parser::ConditionPrimaryContext* ctx
+        RxParser::ConditionPrimaryContext* ctx
     ) override;
 
     std::any visitConditionPrimaryWithoutBareBlock(
-        Parser::ConditionPrimaryWithoutBareBlockContext* ctx
+        RxParser::ConditionPrimaryWithoutBareBlockContext* ctx
     ) override;
 
     // conditionBreak，限制 break 值的开头不能是裸代码块
     std::any visitConditionBreakAssignmentExpression(
-        Parser::ConditionBreakAssignmentExpressionContext* ctx
+        RxParser::ConditionBreakAssignmentExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakLogicalOrExpression(
-        Parser::ConditionBreakLogicalOrExpressionContext* ctx
+        RxParser::ConditionBreakLogicalOrExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakLogicalAndExpression(
-        Parser::ConditionBreakLogicalAndExpressionContext* ctx
+        RxParser::ConditionBreakLogicalAndExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakComparisonExpression(
-        Parser::ConditionBreakComparisonExpressionContext* ctx
+        RxParser::ConditionBreakComparisonExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakBitOrExpression(
-        Parser::ConditionBreakBitOrExpressionContext* ctx
+        RxParser::ConditionBreakBitOrExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakClosedBitOrExpression(
-        Parser::ConditionBreakClosedBitOrExpressionContext* ctx
+        RxParser::ConditionBreakClosedBitOrExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakBitXorExpression(
-        Parser::ConditionBreakBitXorExpressionContext* ctx
+        RxParser::ConditionBreakBitXorExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakClosedBitXorExpression(
-        Parser::ConditionBreakClosedBitXorExpressionContext* ctx
+        RxParser::ConditionBreakClosedBitXorExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakBitAndExpression(
-        Parser::ConditionBreakBitAndExpressionContext* ctx
+        RxParser::ConditionBreakBitAndExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakClosedBitAndExpression(
-        Parser::ConditionBreakClosedBitAndExpressionContext* ctx
+        RxParser::ConditionBreakClosedBitAndExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakShiftExpression(
-        Parser::ConditionBreakShiftExpressionContext* ctx
+        RxParser::ConditionBreakShiftExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakClosedShiftExpression(
-        Parser::ConditionBreakClosedShiftExpressionContext* ctx
+        RxParser::ConditionBreakClosedShiftExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakAdditiveExpression(
-        Parser::ConditionBreakAdditiveExpressionContext* ctx
+        RxParser::ConditionBreakAdditiveExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakClosedAdditiveExpression(
-        Parser::ConditionBreakClosedAdditiveExpressionContext* ctx
+        RxParser::ConditionBreakClosedAdditiveExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakMultiplicativeExpression(
-        Parser::ConditionBreakMultiplicativeExpressionContext* ctx
+        RxParser::ConditionBreakMultiplicativeExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakClosedMultiplicativeExpression(
-        Parser::ConditionBreakClosedMultiplicativeExpressionContext* ctx
+        RxParser::ConditionBreakClosedMultiplicativeExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakCastExpression(
-        Parser::ConditionBreakCastExpressionContext* ctx
+        RxParser::ConditionBreakCastExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakClosedCastExpression(
-        Parser::ConditionBreakClosedCastExpressionContext* ctx
+        RxParser::ConditionBreakClosedCastExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakUnaryExpression(
-        Parser::ConditionBreakUnaryExpressionContext* ctx
+        RxParser::ConditionBreakUnaryExpressionContext* ctx
     ) override;
 
     std::any visitConditionBreakPostfixExpression(
-        Parser::ConditionBreakPostfixExpressionContext* ctx
+        RxParser::ConditionBreakPostfixExpressionContext* ctx
     ) override;
 private:
     //这是类型转换函数，使用的时候是asNode（实际想要的类）

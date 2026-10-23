@@ -1,5 +1,5 @@
 
-// Generated from ../grammar/Parser.g4 by ANTLR 4.13.2
+// Generated from ../grammar/RxParser.g4 by ANTLR 4.13.2
 
 #pragma once
 
@@ -9,7 +9,7 @@
 
 
 
-class  Parser : public antlr4::Parser {
+class  RxParser : public antlr4::Parser {
 public:
   enum {
     AS = 1, BREAK = 2, CONST = 3, CONTINUE = 4, CRATE = 5, ELSE = 6, FALSE = 7, 
@@ -92,11 +92,11 @@ public:
     RuleEqualsSign = 145, RuleIdentifier = 146
   };
 
-  explicit Parser(antlr4::TokenStream *input);
+  explicit RxParser(antlr4::TokenStream *input);
 
-  Parser(antlr4::TokenStream *input, const antlr4::atn::ParserATNSimulatorOptions &options);
+  RxParser(antlr4::TokenStream *input, const antlr4::atn::ParserATNSimulatorOptions &options);
 
-  ~Parser() override;
+  ~RxParser() override;
 
   std::string getGrammarFileName() const override;
 

@@ -5,7 +5,7 @@
 
 #include "antlr4-runtime.h"
 #include "RxLexer.h"
-#include "Parser.h"
+#include "RxParser.h"
 
 #include "rx/ast/expression.hpp"
 #include "rx/ast/item.hpp"
@@ -27,7 +27,7 @@ std::shared_ptr<rx::ast::Program> buildProgram(const std::string& source) {
     antlr4::ANTLRInputStream input(source);
     RxLexer lexer(&input);
     antlr4::CommonTokenStream tokens(&lexer);
-    Parser parser(&tokens);
+    RxParser parser(&tokens);
 
     auto* crate = parser.crate();
     assert(parser.getNumberOfSyntaxErrors() == 0);

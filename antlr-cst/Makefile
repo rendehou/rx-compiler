@@ -19,7 +19,7 @@ generate: $(ANTLR_JAR)
 	rm -rf "$(GEN_DIR)"
 	mkdir -p "$(GEN_DIR)"
 	java -jar "$(ANTLR_JAR)" -Dlanguage=Cpp -visitor -Xexact-output-dir -o "$(GEN_DIR)" "$(GRAMMAR_DIR)/RxLexer.g4"
-	java -jar "$(ANTLR_JAR)" -Dlanguage=Cpp -visitor -Xexact-output-dir -lib "$(GEN_DIR)" -o "$(GEN_DIR)" "$(GRAMMAR_DIR)/Parser.g4"
+	java -jar "$(ANTLR_JAR)" -Dlanguage=Cpp -visitor -Xexact-output-dir -lib "$(GEN_DIR)" -o "$(GEN_DIR)" "$(GRAMMAR_DIR)/RxParser.g4"
 
 cst: generate
 	cmake -S . -B "$(BUILD_DIR)" -DCMAKE_BUILD_TYPE=Release

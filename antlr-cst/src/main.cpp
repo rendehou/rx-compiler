@@ -1,5 +1,5 @@
 #include "RxLexer.h"
-#include "Parser.h"
+#include "RxParser.h"
 #include "antlr4-runtime.h"
 
 #include <fstream>
@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
     antlr4::ANTLRInputStream input(source_file);
     RxLexer lexer(&input);
     antlr4::CommonTokenStream tokens(&lexer);
-    Parser parser(&tokens);
+    RxParser parser(&tokens);
 
     antlr4::tree::ParseTree* tree = parser.crate();
     std::cout << tree->toStringTree(&parser) << '\n';

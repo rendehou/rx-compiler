@@ -20,7 +20,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(antlr4_cpp_source)
 
 set(ANTLR_GENERATED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../build/generated")
-if(NOT EXISTS "${ANTLR_GENERATED_DIR}/Parser.cpp")
+if(NOT EXISTS "${ANTLR_GENERATED_DIR}/RxParser.cpp")
     message(FATAL_ERROR
         "ANTLR generated sources were not found in ${ANTLR_GENERATED_DIR}. "
         "Regenerate the parser before building the AST test."

@@ -19,7 +19,7 @@ namespace rx::frontend {
     }
 
     std::shared_ptr<ast::Program> AstBuilder::build(
-        Parser::CrateContext* ctx
+        RxParser::CrateContext* ctx
     ) {
         
         auto node = std::any_cast<std::shared_ptr<ast::AstNode>>(
@@ -32,7 +32,7 @@ namespace rx::frontend {
     }
 
     //下面开始是具体的
-    std::any AstBuilder::visitCrate(Parser::CrateContext* ctx) {
+    std::any AstBuilder::visitCrate(RxParser::CrateContext* ctx) {
 
         auto program = std::make_shared<ast::Program>();//创建节点
         for (auto* itemCtx : ctx->item()) {
@@ -48,7 +48,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitFunctionDefinition(
-        Parser::FunctionDefinitionContext* ctx
+        RxParser::FunctionDefinitionContext* ctx
     ) {
         auto function = std::make_shared<ast::FunctionItem>();
 
@@ -107,7 +107,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitStructDefinition(
-        Parser::StructDefinitionContext* ctx
+        RxParser::StructDefinitionContext* ctx
     ) {
         auto structure =  std::make_shared<ast::StructItem>();
 
@@ -152,7 +152,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitConstantItem(
-        Parser::ConstantItemContext* ctx
+        RxParser::ConstantItemContext* ctx
     ) {
         auto constant = std::make_shared<ast::ConstantItem>();
 
@@ -175,7 +175,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitInherentImpl(
-        Parser::InherentImplContext* ctx
+        RxParser::InherentImplContext* ctx
     ) {
         auto impl = std::make_shared<ast::ImplItem>();
 
@@ -211,7 +211,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitUseDeclaration(
-        Parser::UseDeclarationContext* ctx
+        RxParser::UseDeclarationContext* ctx
     ) {
         auto use = std::make_shared<ast::UseItem>();
 
@@ -224,7 +224,7 @@ namespace rx::frontend {
 
     //第二部分
     std::any AstBuilder::visitGenericParams(
-        Parser::GenericParamsContext* ctx
+        RxParser::GenericParamsContext* ctx
     ) {
 
         auto parameters = std::make_shared<ast::GenericParameters>();
@@ -245,7 +245,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitLifetimeParam(
-        Parser::LifetimeParamContext* ctx
+        RxParser::LifetimeParamContext* ctx
     ) {
         auto lifetime = std::make_shared<ast::LifetimeParameter>();
 
@@ -263,7 +263,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitSelfParam(//代表自身的参数
-        Parser::SelfParamContext* ctx
+        RxParser::SelfParamContext* ctx
     ) {
 
         auto receiver = std::make_shared<ast::Receiver>();
@@ -290,7 +290,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitFunctionParam(
-        Parser::FunctionParamContext* ctx
+        RxParser::FunctionParamContext* ctx
     ) {
 
         auto parameter =std::make_shared<ast::FunctionParameter>();
@@ -306,7 +306,7 @@ namespace rx::frontend {
         return std::static_pointer_cast<ast::AstNode>(parameter);
     }
     std::any AstBuilder::visitWhereClause(
-        Parser::WhereClauseContext* ctx
+        RxParser::WhereClauseContext* ctx
     ) {
 
         auto where = std::make_shared<ast::WhereClause>();
@@ -324,7 +324,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitWhereClauseItem(
-        Parser::WhereClauseItemContext* ctx
+        RxParser::WhereClauseItemContext* ctx
     ) {
         auto predicate = std::make_shared<ast::WherePredicate>();
 
@@ -362,7 +362,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStructField(
-        Parser::StructFieldContext* ctx
+        RxParser::StructFieldContext* ctx
     ) {
         auto field = std::make_shared<ast::StructField>();
 
@@ -378,7 +378,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitOuterAttribute(
-        Parser::OuterAttributeContext* ctx
+        RxParser::OuterAttributeContext* ctx
     ) {
         auto attribute = std::make_shared<ast::DeriveAttribute>();
 
@@ -402,7 +402,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitAssociatedItem(
-        Parser::AssociatedItemContext* ctx
+        RxParser::AssociatedItemContext* ctx
     ) {
         auto item = std::make_shared<ast::AssociatedItem>();
 
@@ -423,7 +423,7 @@ namespace rx::frontend {
 
     //下面的是第三部分，type和path
     std::any AstBuilder::visitTypeRef(
-        Parser::TypeRefContext* ctx
+        RxParser::TypeRefContext* ctx
     ) {
         if (ctx->LPAREN()) {//判断左括号分类
 
@@ -462,7 +462,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitReferenceType(//引用类型
-        Parser::ReferenceTypeContext* ctx
+        RxParser::ReferenceTypeContext* ctx
     ) {
         auto type = std::make_shared<ast::TypeSyntax>();
 
@@ -496,7 +496,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitArrayType(
-        Parser::ArrayTypeContext* ctx
+        RxParser::ArrayTypeContext* ctx
     ) {
         auto type = std::make_shared<ast::TypeSyntax>();
 
@@ -515,7 +515,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitTypePath(
-        Parser::TypePathContext* ctx
+        RxParser::TypePathContext* ctx
     ) {
         auto path = std::make_shared<ast::Path>();
 
@@ -534,7 +534,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitTypePathSegment(//路径的一段
-        Parser::TypePathSegmentContext* ctx
+        RxParser::TypePathSegmentContext* ctx
     ) {
         auto segment = std::make_shared<ast::PathSegment>();
 
@@ -557,7 +557,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitPathInExpression(//一整条路径
-        Parser::PathInExpressionContext* ctx
+        RxParser::PathInExpressionContext* ctx
     ) {
         auto path = std::make_shared<ast::Path>();
 
@@ -576,7 +576,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitPathExprSegment(//表达式版本的
-        Parser::PathExprSegmentContext* ctx
+        RxParser::PathExprSegmentContext* ctx
     ) {
         auto segment = std::make_shared<ast::PathSegment>();
 
@@ -599,7 +599,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitGenericArg(
-        Parser::GenericArgContext* ctx
+        RxParser::GenericArgContext* ctx
     ) {
         auto argument = std::make_shared<ast::GenericArgumentSyntax>();
 
@@ -621,7 +621,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitClosedCastType(//用来处理歧义
-        Parser::ClosedCastTypeContext* ctx
+        RxParser::ClosedCastTypeContext* ctx
     ) {
 
         //()或者(type)
@@ -708,7 +708,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConstValue(
-        Parser::ConstValueContext* ctx
+        RxParser::ConstValueContext* ctx
     ) {
 
         if (ctx->INTEGER_LITERAL()) {
@@ -781,7 +781,7 @@ namespace rx::frontend {
 
     //blockand statement
     std::any AstBuilder::visitBlockExpression(
-        Parser::BlockExpressionContext* ctx
+        RxParser::BlockExpressionContext* ctx
     ) {
         auto block = std::make_shared<ast::Block>();
 
@@ -805,7 +805,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitStatement(
-        Parser::StatementContext* ctx
+        RxParser::StatementContext* ctx
     ) {
 
         // 空语句
@@ -846,7 +846,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitLetStatement(
-        Parser::LetStatementContext* ctx
+        RxParser::LetStatementContext* ctx
     ) {
         auto statement = std::make_shared<ast::LetStatement>();
 
@@ -871,7 +871,7 @@ namespace rx::frontend {
 
     //block和if语句
      std::any AstBuilder::visitExpressionWithBlock(//block,if,loop,while四种
-        Parser::ExpressionWithBlockContext* ctx
+        RxParser::ExpressionWithBlockContext* ctx
     ) {
         if (ctx->blockExpression() && !ctx->LOOP() && !ctx->WHILE()) {
             auto block = std::make_shared<ast::BlockExpr>();
@@ -911,7 +911,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitIfExpression(
-        Parser::IfExpressionContext* ctx
+        RxParser::IfExpressionContext* ctx
     ) {
         auto expression = std::make_shared<ast::IfExpr>();
 
@@ -950,7 +950,7 @@ namespace rx::frontend {
     // 括号在primaryexpression被定义。primary属于noneblock expression。
 
     std::any AstBuilder::visitAssignmentExpression(//赋值语句
-        Parser::AssignmentExpressionContext* ctx
+        RxParser::AssignmentExpressionContext* ctx
     ) {
         auto left = asNode<ast::Expr>(
             visit(ctx->logicalOrExpression())
@@ -1001,7 +1001,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitLogicalOrExpression(
-        Parser::LogicalOrExpressionContext* ctx
+        RxParser::LogicalOrExpressionContext* ctx
     ) {
         auto expressions = ctx->logicalAndExpression();
 
@@ -1028,7 +1028,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitLogicalAndExpression(
-        Parser::LogicalAndExpressionContext* ctx
+        RxParser::LogicalAndExpressionContext* ctx
     ) {
         auto expressions = ctx->comparisonExpression();
 
@@ -1055,7 +1055,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitComparisonExpression(
-        Parser::ComparisonExpressionContext* ctx
+        RxParser::ComparisonExpressionContext* ctx
     ) {
         std::shared_ptr<ast::Expr> left;
         std::shared_ptr<ast::Expr> right;
@@ -1116,7 +1116,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitBitOrExpression(
-        Parser::BitOrExpressionContext* ctx
+        RxParser::BitOrExpressionContext* ctx
     ) {
         auto expressions = ctx->bitXorExpression();
 
@@ -1142,7 +1142,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitBitXorExpression(
-        Parser::BitXorExpressionContext* ctx
+        RxParser::BitXorExpressionContext* ctx
     ) {
         auto expressions = ctx->bitAndExpression();
 
@@ -1168,7 +1168,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitBitAndExpression(
-        Parser::BitAndExpressionContext* ctx
+        RxParser::BitAndExpressionContext* ctx
     ) {
         auto expressions = ctx->shiftExpression();
 
@@ -1194,7 +1194,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitShiftExpression(//左右移动
-        Parser::ShiftExpressionContext* ctx
+        RxParser::ShiftExpressionContext* ctx
     ) {
         std::shared_ptr<ast::Expr> result;
         std::string op;
@@ -1242,7 +1242,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitAdditiveExpression(//加减
-        Parser::AdditiveExpressionContext* ctx
+        RxParser::AdditiveExpressionContext* ctx
     ) {
         auto expressions = ctx->multiplicativeExpression();
         auto operators = ctx->additiveOperator();
@@ -1273,7 +1273,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitMultiplicativeExpression(
-        Parser::MultiplicativeExpressionContext* ctx
+        RxParser::MultiplicativeExpressionContext* ctx
     ) {
         auto expressions = ctx->castExpression();
         auto operators = ctx->multiplicativeOperator();
@@ -1309,7 +1309,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitCastExpression(//
-        Parser::CastExpressionContext* ctx
+        RxParser::CastExpressionContext* ctx
     ) {
         auto result = asNode<ast::Expr>(
             visit(ctx->unaryExpression())
@@ -1332,7 +1332,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitUnaryExpression(//单元运算符，例如！,&等
-        Parser::UnaryExpressionContext* ctx
+        RxParser::UnaryExpressionContext* ctx
     ) {
         if (ctx->postfixExpression()) {
             return visit(ctx->postfixExpression());
@@ -1387,7 +1387,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitPostfixExpression(//后缀，如 . ,->等
-        Parser::PostfixExpressionContext* ctx
+        RxParser::PostfixExpressionContext* ctx
     ) {
         auto expression = asNode<ast::Expr>(
             visit(ctx->primaryExpression())
@@ -1464,7 +1464,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitNonBlockPrimary(//最终处理最小的式子
-        Parser::NonBlockPrimaryContext* ctx
+        RxParser::NonBlockPrimaryContext* ctx
     ) {
 
         if (ctx->literalExpression()) {
@@ -1558,7 +1558,7 @@ namespace rx::frontend {
         );
     }
     std::any AstBuilder::visitLiteralExpression(//字面表达式，如数字
-        Parser::LiteralExpressionContext* ctx
+        RxParser::LiteralExpressionContext* ctx
     ) {
 
         if (ctx->INTEGER_LITERAL()) {
@@ -1582,7 +1582,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitArrayExpression(
-        Parser::ArrayExpressionContext* ctx
+        RxParser::ArrayExpressionContext* ctx
     ) {
         auto expressions = ctx->expression();
 
@@ -1620,7 +1620,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitStructExprField(
-        Parser::StructExprFieldContext* ctx
+        RxParser::StructExprFieldContext* ctx
     ) {
         auto field = std::make_shared<ast::StructInitializerField>();
 
@@ -1638,7 +1638,7 @@ namespace rx::frontend {
         // use与别名
 
     std::any AstBuilder::visitUseTree(//路径树,需要讨论::的个数
-        Parser::UseTreeContext* ctx
+        RxParser::UseTreeContext* ctx
     ) {
         auto tree = std::make_shared<ast::UseTree>();
 
@@ -1697,7 +1697,7 @@ namespace rx::frontend {
     
     //cklosed是比较运算符前面的内容，用于标记
     std::any AstBuilder::visitClosedBitOrExpression(
-        Parser::ClosedBitOrExpressionContext* ctx
+        RxParser::ClosedBitOrExpressionContext* ctx
     ) {
         auto expressions = ctx->bitXorExpression();
         if (expressions.empty()) {
@@ -1733,7 +1733,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitClosedBitXorExpression(
-        Parser::ClosedBitXorExpressionContext* ctx
+        RxParser::ClosedBitXorExpressionContext* ctx
     ) {
         auto expressions = ctx->bitAndExpression();
 
@@ -1770,7 +1770,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitClosedBitAndExpression(
-        Parser::ClosedBitAndExpressionContext* ctx
+        RxParser::ClosedBitAndExpressionContext* ctx
     ) {
         auto expressions = ctx->shiftExpression();
 
@@ -1807,7 +1807,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitClosedShiftExpression(
-        Parser::ClosedShiftExpressionContext* ctx
+        RxParser::ClosedShiftExpressionContext* ctx
     ) {
         //处理 a << b >> c 这种移位表达式
         std::shared_ptr<ast::Expr> result;
@@ -1859,7 +1859,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitClosedAdditiveExpression(
-        Parser::ClosedAdditiveExpressionContext* ctx
+        RxParser::ClosedAdditiveExpressionContext* ctx
     ) {
         // 处理a + b - close c
         auto expressions = ctx->multiplicativeExpression();
@@ -1909,7 +1909,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitClosedMultiplicativeExpression(
-        Parser::ClosedMultiplicativeExpressionContext* ctx
+        RxParser::ClosedMultiplicativeExpressionContext* ctx
     ) {
         auto expressions = ctx->castExpression();
         auto operators = ctx->multiplicativeOperator();
@@ -1965,7 +1965,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitClosedCastExpression(
-        Parser::ClosedCastExpressionContext* ctx
+        RxParser::ClosedCastExpressionContext* ctx
     ) {
         //没有类型转换
         if (ctx->unaryExpression()) {
@@ -1989,7 +1989,7 @@ namespace rx::frontend {
     //接下来处理statement相关expression
     //statement语句开头会给个标记，因为statement类可以不用分号结尾，因此编译器必须要判断当前stmt是否结束。
     std::any AstBuilder::visitStatementAssignmentExpression(
-        Parser::StatementAssignmentExpressionContext* ctx
+        RxParser::StatementAssignmentExpressionContext* ctx
     ) {
         // 处理 statement开头的赋值，例如a.field = value
         
@@ -2038,7 +2038,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementLogicalOrExpression(
-        Parser::StatementLogicalOrExpressionContext* ctx
+        RxParser::StatementLogicalOrExpressionContext* ctx
     ) {
         
         auto result = asNode<ast::Expr>(
@@ -2062,7 +2062,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementLogicalAndExpression(
-        Parser::StatementLogicalAndExpressionContext* ctx
+        RxParser::StatementLogicalAndExpressionContext* ctx
     ) {
         // 处理 statement开头的&&运算
         auto result = asNode<ast::Expr>(
@@ -2086,7 +2086,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementComparisonExpression(
-        Parser::StatementComparisonExpressionContext* ctx
+        RxParser::StatementComparisonExpressionContext* ctx
     ) {
         // 处理 == !=等，其中<>要参与尖括号特殊判定
         std::shared_ptr<ast::Expr> left;
@@ -2143,7 +2143,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementBitOrExpression(
-        Parser::StatementBitOrExpressionContext* ctx
+        RxParser::StatementBitOrExpressionContext* ctx
     ) {
         auto result = asNode<ast::Expr>(
             visit(ctx->statementBitXorExpression())
@@ -2166,7 +2166,7 @@ namespace rx::frontend {
 
     //closed和statement叠在一起
     std::any AstBuilder::visitStatementClosedBitOrExpression(
-        Parser::StatementClosedBitOrExpressionContext* ctx
+        RxParser::StatementClosedBitOrExpressionContext* ctx
     ) {
         
         if (ctx->statementClosedBitXorExpression()) {
@@ -2201,7 +2201,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementBitXorExpression(
-        Parser::StatementBitXorExpressionContext* ctx
+        RxParser::StatementBitXorExpressionContext* ctx
     ) {
         auto result = asNode<ast::Expr>(
             visit(ctx->statementBitAndExpression())
@@ -2224,7 +2224,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementClosedBitXorExpression(
-        Parser::StatementClosedBitXorExpressionContext* ctx
+        RxParser::StatementClosedBitXorExpressionContext* ctx
     ) {
                 if (ctx->statementClosedBitAndExpression()) {
             return visit(ctx->statementClosedBitAndExpression());
@@ -2258,7 +2258,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementBitAndExpression(
-        Parser::StatementBitAndExpressionContext* ctx
+        RxParser::StatementBitAndExpressionContext* ctx
     ) {
 
         auto result = asNode<ast::Expr>(
@@ -2282,7 +2282,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementClosedBitAndExpression(
-        Parser::StatementClosedBitAndExpressionContext* ctx
+        RxParser::StatementClosedBitAndExpressionContext* ctx
     ) {
         if (ctx->statementClosedShiftExpression()) {
             return visit(ctx->statementClosedShiftExpression());
@@ -2316,7 +2316,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementShiftExpression(
-        Parser::StatementShiftExpressionContext* ctx
+        RxParser::StatementShiftExpressionContext* ctx
     ) {
         std::shared_ptr<ast::Expr> result;
         std::string op;
@@ -2365,7 +2365,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementClosedShiftExpression(
-        Parser::StatementClosedShiftExpressionContext* ctx
+        RxParser::StatementClosedShiftExpressionContext* ctx
     ) {
         // closed版本的移位表达式，最终必须返回closedAdditiveExpression
         
@@ -2416,7 +2416,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementAdditiveExpression(
-        Parser::StatementAdditiveExpressionContext* ctx
+        RxParser::StatementAdditiveExpressionContext* ctx
     ) {
         
         auto result = asNode<ast::Expr>(
@@ -2448,7 +2448,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementClosedAdditiveExpression(
-        Parser::StatementClosedAdditiveExpressionContext* ctx
+        RxParser::StatementClosedAdditiveExpressionContext* ctx
     ) {
         // closed版本有两种情况：有可能直接是close，也有可能是与普通multiplicative运算
         if (ctx->statementClosedMultiplicativeExpression()) {
@@ -2498,7 +2498,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementMultiplicativeExpression(
-        Parser::StatementMultiplicativeExpressionContext* ctx
+        RxParser::StatementMultiplicativeExpressionContext* ctx
     ) {
         
         auto result = asNode<ast::Expr>(
@@ -2533,7 +2533,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementClosedMultiplicativeExpression(
-        Parser::StatementClosedMultiplicativeExpressionContext* ctx
+        RxParser::StatementClosedMultiplicativeExpressionContext* ctx
     ) {
         //类似加减法
         if (ctx->statementClosedCastExpression()) {
@@ -2589,7 +2589,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementCastExpression(
-        Parser::StatementCastExpressionContext* ctx
+        RxParser::StatementCastExpressionContext* ctx
     ) {
         // 处理x as T as U形。第一个表达式受 statement 限制，类型转换本身和普通 CastExpr 一样
         auto result = asNode<ast::Expr>(
@@ -2612,7 +2612,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementClosedCastExpression(
-        Parser::StatementClosedCastExpressionContext* ctx
+        RxParser::StatementClosedCastExpressionContext* ctx
     ) {
         // 两种情况：只有statementUnaryExpression或statementCastExpression as closedCastType
         if (ctx->statementUnaryExpression()) {
@@ -2634,7 +2634,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementUnaryExpression(
-        Parser::StatementUnaryExpressionContext* ctx
+        RxParser::StatementUnaryExpressionContext* ctx
     ) {
         // statement版本的单目表达式，没有单目运算符时进入 statementPostfixExpression
         if (ctx->statementPostfixExpression()) {
@@ -2687,7 +2687,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitStatementPostfixExpression(
-        Parser::StatementPostfixExpressionContext* ctx
+        RxParser::StatementPostfixExpressionContext* ctx
     ) {
         // statementPostfix有两种开头：普通 nonBlockPrimary，例如 x.foo()或 expressionWithBlock 后先接一个 dotSuffix，例如 { ... }.foo
 
@@ -2801,7 +2801,7 @@ namespace rx::frontend {
 
     //condition主要区分if后面遇到{}的歧义。if + 类 + {}会被识别成if的then语句，给类初始化要加括号
     std::any AstBuilder::visitConditionAssignmentExpression(
-        Parser::ConditionAssignmentExpressionContext* ctx
+        RxParser::ConditionAssignmentExpressionContext* ctx
     ) {
         auto left = asNode<ast::Expr>(
             visit(ctx->conditionLogicalOrExpression())
@@ -2852,7 +2852,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionLogicalOrExpression(
-        Parser::ConditionLogicalOrExpressionContext* ctx
+        RxParser::ConditionLogicalOrExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionLogicalAndExpression();
 
@@ -2879,7 +2879,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionLogicalAndExpression(
-        Parser::ConditionLogicalAndExpressionContext* ctx
+        RxParser::ConditionLogicalAndExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionComparisonExpression();
 
@@ -2906,7 +2906,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionComparisonExpression(
-        Parser::ConditionComparisonExpressionContext* ctx
+        RxParser::ConditionComparisonExpressionContext* ctx
     ) {
         std::shared_ptr<ast::Expr> left;
         std::shared_ptr<ast::Expr> right;
@@ -2966,7 +2966,7 @@ namespace rx::frontend {
         );
     }
     std::any AstBuilder::visitConditionBitOrExpression(
-        Parser::ConditionBitOrExpressionContext* ctx
+        RxParser::ConditionBitOrExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionBitXorExpression();
 
@@ -2993,7 +2993,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionClosedBitOrExpression(
-        Parser::ConditionClosedBitOrExpressionContext* ctx
+        RxParser::ConditionClosedBitOrExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionBitXorExpression();
 
@@ -3030,7 +3030,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionBitXorExpression(
-        Parser::ConditionBitXorExpressionContext* ctx
+        RxParser::ConditionBitXorExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionBitAndExpression();
 
@@ -3057,7 +3057,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionClosedBitXorExpression(
-        Parser::ConditionClosedBitXorExpressionContext* ctx
+        RxParser::ConditionClosedBitXorExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionBitAndExpression();
 
@@ -3093,7 +3093,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitConditionBitAndExpression(
-        Parser::ConditionBitAndExpressionContext* ctx
+        RxParser::ConditionBitAndExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionShiftExpression();
 
@@ -3120,7 +3120,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionClosedBitAndExpression(
-        Parser::ConditionClosedBitAndExpressionContext* ctx
+        RxParser::ConditionClosedBitAndExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionShiftExpression();
 
@@ -3156,7 +3156,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitConditionShiftExpression(
-        Parser::ConditionShiftExpressionContext* ctx
+        RxParser::ConditionShiftExpressionContext* ctx
     ) {
         std::shared_ptr<ast::Expr> result;
         std::string op;
@@ -3206,7 +3206,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionClosedShiftExpression(
-        Parser::ConditionClosedShiftExpressionContext* ctx
+        RxParser::ConditionClosedShiftExpressionContext* ctx
     ) {
         // condition 的 closed 版本移位表达式
 
@@ -3256,7 +3256,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitConditionAdditiveExpression(
-        Parser::ConditionAdditiveExpressionContext* ctx
+        RxParser::ConditionAdditiveExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionMultiplicativeExpression();
         auto operators = ctx->additiveOperator();
@@ -3289,7 +3289,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionClosedAdditiveExpression(
-        Parser::ConditionClosedAdditiveExpressionContext* ctx
+        RxParser::ConditionClosedAdditiveExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionMultiplicativeExpression();
         auto operators = ctx->additiveOperator();
@@ -3335,7 +3335,7 @@ namespace rx::frontend {
         return std::static_pointer_cast<ast::AstNode>(binary);
     }
     std::any AstBuilder::visitConditionMultiplicativeExpression(
-        Parser::ConditionMultiplicativeExpressionContext* ctx
+        RxParser::ConditionMultiplicativeExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionCastExpression();
         auto operators = ctx->multiplicativeOperator();
@@ -3372,7 +3372,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionClosedMultiplicativeExpression(
-        Parser::ConditionClosedMultiplicativeExpressionContext* ctx
+        RxParser::ConditionClosedMultiplicativeExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionCastExpression();
         auto operators = ctx->multiplicativeOperator();
@@ -3426,7 +3426,7 @@ namespace rx::frontend {
         return std::static_pointer_cast<ast::AstNode>(binary);
     }
     std::any AstBuilder::visitConditionCastExpression(
-        Parser::ConditionCastExpressionContext* ctx
+        RxParser::ConditionCastExpressionContext* ctx
     ) {
         auto result = asNode<ast::Expr>(
             visit(ctx->conditionUnaryExpression())
@@ -3450,7 +3450,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionClosedCastExpression(
-        Parser::ConditionClosedCastExpressionContext* ctx
+        RxParser::ConditionClosedCastExpressionContext* ctx
     ) {
         if (ctx->conditionUnaryExpression()) {
             return visit(ctx->conditionUnaryExpression());
@@ -3469,7 +3469,7 @@ namespace rx::frontend {
         return std::static_pointer_cast<ast::AstNode>(expression);
     }
     std::any AstBuilder::visitConditionUnaryExpression(
-        Parser::ConditionUnaryExpressionContext* ctx
+        RxParser::ConditionUnaryExpressionContext* ctx
     ) {
         if (ctx->conditionPostfixExpression()) {
             return visit(ctx->conditionPostfixExpression());
@@ -3526,7 +3526,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionPostfixExpression(
-        Parser::ConditionPostfixExpressionContext* ctx
+        RxParser::ConditionPostfixExpressionContext* ctx
     ) {
         auto expression = asNode<ast::Expr>(
             visit(ctx->conditionPrimary())
@@ -3603,7 +3603,7 @@ namespace rx::frontend {
 
     // 裸代码块或表达式
     std::any AstBuilder::visitConditionPrimary(
-        Parser::ConditionPrimaryContext* ctx
+        RxParser::ConditionPrimaryContext* ctx
     ) {
         // 优先处理字面量、路径、括号、数组等非裸代码块表达式。
         if (ctx->conditionPrimaryWithoutBareBlock()) {
@@ -3623,7 +3623,7 @@ namespace rx::frontend {
 
     
     std::any AstBuilder::visitConditionPrimaryWithoutBareBlock(
-        Parser::ConditionPrimaryWithoutBareBlockContext* ctx
+        RxParser::ConditionPrimaryWithoutBareBlockContext* ctx
     ) {
         
         if (ctx->literalExpression()) {
@@ -3714,7 +3714,7 @@ namespace rx::frontend {
     }
 
         std::any AstBuilder::visitConditionBreakAssignmentExpression(
-        Parser::ConditionBreakAssignmentExpressionContext* ctx
+        RxParser::ConditionBreakAssignmentExpressionContext* ctx
     ) {
         auto left = asNode<ast::Expr>(
             visit(ctx->conditionBreakLogicalOrExpression())
@@ -3765,7 +3765,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionBreakLogicalOrExpression(
-        Parser::ConditionBreakLogicalOrExpressionContext* ctx
+        RxParser::ConditionBreakLogicalOrExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionLogicalAndExpression();
 
@@ -3792,7 +3792,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionBreakLogicalAndExpression(
-        Parser::ConditionBreakLogicalAndExpressionContext* ctx
+        RxParser::ConditionBreakLogicalAndExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionComparisonExpression();
 
@@ -3819,7 +3819,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionBreakComparisonExpression(
-        Parser::ConditionBreakComparisonExpressionContext* ctx
+        RxParser::ConditionBreakComparisonExpressionContext* ctx
     ) {
         std::shared_ptr<ast::Expr> left;
         std::shared_ptr<ast::Expr> right;
@@ -3878,7 +3878,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitConditionBreakBitOrExpression(
-        Parser::ConditionBreakBitOrExpressionContext* ctx
+        RxParser::ConditionBreakBitOrExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionBitXorExpression();
 
@@ -3905,7 +3905,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionBreakClosedBitOrExpression(
-        Parser::ConditionBreakClosedBitOrExpressionContext* ctx
+        RxParser::ConditionBreakClosedBitOrExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionBitXorExpression();
 
@@ -3942,7 +3942,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionBreakBitXorExpression(
-        Parser::ConditionBreakBitXorExpressionContext* ctx
+        RxParser::ConditionBreakBitXorExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionBitAndExpression();
 
@@ -3969,7 +3969,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionBreakClosedBitXorExpression(
-        Parser::ConditionBreakClosedBitXorExpressionContext* ctx
+        RxParser::ConditionBreakClosedBitXorExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionBitAndExpression();
 
@@ -4005,7 +4005,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitConditionBreakBitAndExpression(
-        Parser::ConditionBreakBitAndExpressionContext* ctx
+        RxParser::ConditionBreakBitAndExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionShiftExpression();
 
@@ -4032,7 +4032,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionBreakClosedBitAndExpression(
-        Parser::ConditionBreakClosedBitAndExpressionContext* ctx
+        RxParser::ConditionBreakClosedBitAndExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionShiftExpression();
 
@@ -4068,7 +4068,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitConditionBreakShiftExpression(
-        Parser::ConditionBreakShiftExpressionContext* ctx
+        RxParser::ConditionBreakShiftExpressionContext* ctx
     ) {
         std::shared_ptr<ast::Expr> result;
         std::string op;
@@ -4118,7 +4118,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionBreakClosedShiftExpression(
-        Parser::ConditionBreakClosedShiftExpressionContext* ctx
+        RxParser::ConditionBreakClosedShiftExpressionContext* ctx
     ) {
         // conditionBreak 的 closed 版本移位表达式
 
@@ -4168,7 +4168,7 @@ namespace rx::frontend {
     }
 
     std::any AstBuilder::visitConditionBreakAdditiveExpression(
-        Parser::ConditionBreakAdditiveExpressionContext* ctx
+        RxParser::ConditionBreakAdditiveExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionMultiplicativeExpression();
         auto operators = ctx->additiveOperator();
@@ -4201,7 +4201,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionBreakClosedAdditiveExpression(
-        Parser::ConditionBreakClosedAdditiveExpressionContext* ctx
+        RxParser::ConditionBreakClosedAdditiveExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionMultiplicativeExpression();
         auto operators = ctx->additiveOperator();
@@ -4247,7 +4247,7 @@ namespace rx::frontend {
         return std::static_pointer_cast<ast::AstNode>(binary);
     }
     std::any AstBuilder::visitConditionBreakMultiplicativeExpression(
-        Parser::ConditionBreakMultiplicativeExpressionContext* ctx
+        RxParser::ConditionBreakMultiplicativeExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionCastExpression();
         auto operators = ctx->multiplicativeOperator();
@@ -4284,7 +4284,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionBreakClosedMultiplicativeExpression(
-        Parser::ConditionBreakClosedMultiplicativeExpressionContext* ctx
+        RxParser::ConditionBreakClosedMultiplicativeExpressionContext* ctx
     ) {
         auto expressions = ctx->conditionCastExpression();
         auto operators = ctx->multiplicativeOperator();
@@ -4338,7 +4338,7 @@ namespace rx::frontend {
         return std::static_pointer_cast<ast::AstNode>(binary);
     }
     std::any AstBuilder::visitConditionBreakCastExpression(
-        Parser::ConditionBreakCastExpressionContext* ctx
+        RxParser::ConditionBreakCastExpressionContext* ctx
     ) {
         auto result = asNode<ast::Expr>(
             visit(ctx->conditionBreakUnaryExpression())
@@ -4362,7 +4362,7 @@ namespace rx::frontend {
 
 
     std::any AstBuilder::visitConditionBreakClosedCastExpression(
-        Parser::ConditionBreakClosedCastExpressionContext* ctx
+        RxParser::ConditionBreakClosedCastExpressionContext* ctx
     ) {
         if (ctx->conditionBreakUnaryExpression()) {
             return visit(ctx->conditionBreakUnaryExpression());
@@ -4381,7 +4381,7 @@ namespace rx::frontend {
         return std::static_pointer_cast<ast::AstNode>(expression);
     }
     std::any AstBuilder::visitConditionBreakUnaryExpression(
-        Parser::ConditionBreakUnaryExpressionContext* ctx
+        RxParser::ConditionBreakUnaryExpressionContext* ctx
     ) {
         if (ctx->conditionBreakPostfixExpression()) {
             return visit(ctx->conditionBreakPostfixExpression());
@@ -4439,7 +4439,7 @@ namespace rx::frontend {
     // break 值的特殊限制：第一个 primary 不能是裸代码块
     // 括号中的表达式仍然使用普通 expression，可以包含代码块
     std::any AstBuilder::visitConditionBreakPostfixExpression(
-        Parser::ConditionBreakPostfixExpressionContext* ctx
+        RxParser::ConditionBreakPostfixExpressionContext* ctx
     ) {
         auto expression = asNode<ast::Expr>(
             visit(ctx->conditionPrimaryWithoutBareBlock())
