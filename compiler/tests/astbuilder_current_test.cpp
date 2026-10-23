@@ -4,7 +4,7 @@
 #include <string>
 
 #include "antlr4-runtime.h"
-#include "Lexer.h"
+#include "RxLexer.h"
 #include "Parser.h"
 
 #include "rx/ast/expression.hpp"
@@ -25,7 +25,7 @@ std::shared_ptr<T> requireNode(const std::shared_ptr<U>& node) {
 
 std::shared_ptr<rx::ast::Program> buildProgram(const std::string& source) {
     antlr4::ANTLRInputStream input(source);
-    Lexer lexer(&input);
+    RxLexer lexer(&input);
     antlr4::CommonTokenStream tokens(&lexer);
     Parser parser(&tokens);
 

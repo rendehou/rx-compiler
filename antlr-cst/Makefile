@@ -16,8 +16,9 @@ $(ANTLR_JAR):
 	mv "$@.download" "$@"
 
 generate: $(ANTLR_JAR)
+	rm -rf "$(GEN_DIR)"
 	mkdir -p "$(GEN_DIR)"
-	java -jar "$(ANTLR_JAR)" -Dlanguage=Cpp -visitor -Xexact-output-dir -o "$(GEN_DIR)" "$(GRAMMAR_DIR)/Lexer.g4"
+	java -jar "$(ANTLR_JAR)" -Dlanguage=Cpp -visitor -Xexact-output-dir -o "$(GEN_DIR)" "$(GRAMMAR_DIR)/RxLexer.g4"
 	java -jar "$(ANTLR_JAR)" -Dlanguage=Cpp -visitor -Xexact-output-dir -lib "$(GEN_DIR)" -o "$(GEN_DIR)" "$(GRAMMAR_DIR)/Parser.g4"
 
 cst: generate

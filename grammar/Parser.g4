@@ -2,7 +2,7 @@
 // Read README.md for token conventions, precedence, and block tails.
 parser grammar Parser;
 
-options { tokenVocab=Lexer; }
+options { tokenVocab=RxLexer; }
 
 crate
     : item* EOF

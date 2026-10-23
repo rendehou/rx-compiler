@@ -1,6 +1,6 @@
 # Rx ANTLR CST viewer (C++)
 
-This standalone C++ program uses the repository's `grammar/Lexer.g4` and
+This standalone C++ program uses the repository's `grammar/RxLexer.g4` and
 `grammar/Parser.g4` to parse an Rx source file and print ANTLR's parenthesized
 concrete syntax tree (CST). The original grammar files are used directly and
 are not modified. This tool only displays the CST; it does not build an AST.

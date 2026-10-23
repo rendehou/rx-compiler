@@ -1,4 +1,4 @@
-#include "Lexer.h"
+#include "RxLexer.h"
 #include "Parser.h"
 #include "antlr4-runtime.h"
 
@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     }
 
     antlr4::ANTLRInputStream input(source_file);
-    Lexer lexer(&input);
+    RxLexer lexer(&input);
     antlr4::CommonTokenStream tokens(&lexer);
     Parser parser(&tokens);
 

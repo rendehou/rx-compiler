@@ -1,8 +1,8 @@
 
-// Generated from ../grammar/Lexer.g4 by ANTLR 4.13.2
+// Generated from ../grammar/RxLexer.g4 by ANTLR 4.13.2
 
 
-#include "Lexer.h"
+#include "RxLexer.h"
 
 
 using namespace antlr4;
@@ -851,47 +851,47 @@ void lexerLexerInitialize() {
 
 }
 
-Lexer::Lexer(CharStream *input) : Lexer(input) {
-  Lexer::initialize();
+RxLexer::RxLexer(CharStream *input) : antlr4::Lexer(input) {
+  RxLexer::initialize();
   _interpreter = new atn::LexerATNSimulator(this, *lexerLexerStaticData->atn, lexerLexerStaticData->decisionToDFA, lexerLexerStaticData->sharedContextCache);
 }
 
-Lexer::~Lexer() {
+RxLexer::~RxLexer() {
   delete _interpreter;
 }
 
-std::string Lexer::getGrammarFileName() const {
-  return "Lexer.g4";
+std::string RxLexer::getGrammarFileName() const {
+  return "RxLexer.g4";
 }
 
-const std::vector<std::string>& Lexer::getRuleNames() const {
+const std::vector<std::string>& RxLexer::getRuleNames() const {
   return lexerLexerStaticData->ruleNames;
 }
 
-const std::vector<std::string>& Lexer::getChannelNames() const {
+const std::vector<std::string>& RxLexer::getChannelNames() const {
   return lexerLexerStaticData->channelNames;
 }
 
-const std::vector<std::string>& Lexer::getModeNames() const {
+const std::vector<std::string>& RxLexer::getModeNames() const {
   return lexerLexerStaticData->modeNames;
 }
 
-const dfa::Vocabulary& Lexer::getVocabulary() const {
+const dfa::Vocabulary& RxLexer::getVocabulary() const {
   return lexerLexerStaticData->vocabulary;
 }
 
-antlr4::atn::SerializedATNView Lexer::getSerializedATN() const {
+antlr4::atn::SerializedATNView RxLexer::getSerializedATN() const {
   return lexerLexerStaticData->serializedATN;
 }
 
-const atn::ATN& Lexer::getATN() const {
+const atn::ATN& RxLexer::getATN() const {
   return *lexerLexerStaticData->atn;
 }
 
 
 
 
-void Lexer::initialize() {
+void RxLexer::initialize() {
 #if ANTLR4_USE_THREAD_LOCAL_CACHE
   lexerLexerInitialize();
 #else
