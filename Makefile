@@ -23,3 +23,10 @@ export FILTER STAGE CLANG COMPILE_TIMEOUT RUN_TIMEOUT VERBOSE
 .PHONY: test
 test:
 	@$(PYTHON) scripts/test.py
+
+# Build and run the AST Builder unit test independently of the course test suite.
+.PHONY: test-ast
+test-ast:
+	@cmake -S compiler/tests -B target/ast-test -DCMAKE_BUILD_TYPE=Debug
+	@cmake --build target/ast-test --config Debug --parallel
+	@ctest --test-dir target/ast-test -C Debug --output-on-failure
