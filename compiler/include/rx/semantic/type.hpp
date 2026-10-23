@@ -50,8 +50,8 @@ namespace rx::semantic {
         static Type makeUSize();
         static Type makeBool();
         static Type makeUnit();
-        static Type makeNever();
-        static Type makeError();
+        static Type makeNever();//用来标注某些进程，某段代码的结束
+        static Type makeError();//抛出错误
         static Type makeStruct(std::string name);
         static Type makeReference(Type referent, bool mutable_reference);
         static Type makeArray(Type element, std::uint64_t length);
@@ -75,10 +75,9 @@ namespace rx::semantic {
         bool operator==(const Type& other) const;
         bool operator!=(const Type& other) const;
 
-        Type resolveType(//类型转换，把ast的类型转换成自然类型
-            const std::shared_ptr<rx::ast::TypeSyntax>& syntax,
-            const std::string& self_type = ""
-        );
     };
-
+    Type resolveType(//类型转换，把ast的类型转换成自然类型
+        const std::shared_ptr<rx::ast::TypeSyntax>& syntax,
+        const std::string& self_type = ""
+    );
 } // namespace rx::semantic
