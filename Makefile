@@ -28,5 +28,5 @@ test:
 .PHONY: test-ast
 test-ast:
 	@cmake -S compiler/tests -B target/ast-test -DCMAKE_BUILD_TYPE=Debug
-	@cmake --build target/ast-test --config Debug --parallel
+	@cmake --build target/ast-test --config Debug --parallel 2
 	@ctest --test-dir target/ast-test -C Debug --output-on-failure
