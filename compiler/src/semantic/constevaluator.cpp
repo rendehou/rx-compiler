@@ -108,39 +108,50 @@ namespace rx::semantic {
         return false;
     }
 
-    bool ConstEvaluator::evaluateByName(//根据名称查找，如果不存在就进行计算
+    bool ConstEvaluator::evaluateByName(//按名字查找，不存在就计算
         const std::string& name,
         ConstValue& result
     ) {
         auto state_it = states_.find(name);
+
         if (state_it != states_.end()) {
+
             if (state_it->second == ConstState::Evaluated) {
                 result = values_.at(name);
                 return true;
             }
+
+            if (state_it->second == ConstState::Evaluating) {//在计算的过程中再次遇到有占用的
+                return false;
+            }
         }
 
         auto symbol_it = value_map.find(name);
-
         if (symbol_it == value_map.end()) {
             return false;
         }
+
         if (symbol_it->second.kind != ValueSymbolKind::Constant) {
             return false;
         }
-
         auto constant = symbol_it->second.constant;
         if (!constant) {
             return false;
         }
+
+        // 在递归计算前标记正在计算
+        states_[name] = ConstState::Evaluating;
+
         ConstValue value;
 
         if (!evaluateConstant(constant, value)) {
             states_[name] = ConstState::Unvisited;
             return false;
         }
+
         states_[name] = ConstState::Evaluated;
         values_[name] = value;
+
         result = value;
 
         return true;

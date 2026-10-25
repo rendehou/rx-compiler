@@ -5,8 +5,6 @@
 
 namespace rx::semantic {
     
-    std::unordered_set<std::string> parameter_names;
-    std::unordered_set<std::string> field_names;
 
     bool checkDeclarations(
         const std::shared_ptr<rx::ast::Program>& program

@@ -13,6 +13,7 @@ namespace rx::semantic {
 
     enum class ConstState {
         Unvisited,
+        Evaluating,
         Evaluated
     };
 

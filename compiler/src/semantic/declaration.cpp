@@ -9,6 +9,8 @@ namespace rx::semantic {
     bool checkFunctionDeclaration(//检查参数名是否重复、参数类型是否合法、返回类型是否合法
         const std::shared_ptr<rx::ast::FunctionItem>& function
     ) {
+        std::unordered_set<std::string> parameter_names;
+    
         for (const auto& parameter : function->parameters) {
             if (parameter_names.find(parameter->name) != parameter_names.end()) {
                 return false; // 判定失败，参数名字重了
@@ -32,7 +34,8 @@ namespace rx::semantic {
     bool checkStructDeclaration( 
         const std::shared_ptr<rx::ast::StructItem>& structure
     ) {//struct字段名是否重复、字段类型是否合法
-
+        
+        std::unordered_set<std::string> field_names;
         for (const auto& field : structure->fields) {
             if (field_names.find(field->name) != field_names.end()) {
                 return false; // 判定失败，字段名字重复

@@ -3,7 +3,8 @@
 //collector负责存变量，函数，结构体名字并判断重复
 namespace rx::semantic{
     //value存值和函数，struct存结构体]
-    
+    std::unordered_map<std::string,std::shared_ptr<rx::ast::StructItem>> struct_map;
+    std::unordered_map<std::string, ValueSymbol> value_map;
     bool collectItems (
         const std::shared_ptr<rx::ast::Program> &program
     ) {
