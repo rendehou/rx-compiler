@@ -1,4 +1,4 @@
-#include "include/rx/semantic/collector.hpp"
+#include "rx/semantic/collector.hpp"
 
 //collector负责存变量，函数，结构体名字并判断重复
 namespace rx::semantic{

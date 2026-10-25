@@ -30,3 +30,10 @@ test-ast:
 	@cmake -S compiler/tests -B target/ast-test -DCMAKE_BUILD_TYPE=Debug
 	@cmake --build target/ast-test --config Debug --parallel 2
 	@ctest --test-dir target/ast-test -C Debug --output-on-failure
+
+# Build and run the first-pass semantic unit test without ANTLR dependencies.
+.PHONY: test-semantic
+test-semantic:
+	@cmake -S compiler/tests/semantic -B target/semantic-test -DCMAKE_BUILD_TYPE=Debug
+	@cmake --build target/semantic-test --parallel 2
+	@ctest --test-dir target/semantic-test --output-on-failure

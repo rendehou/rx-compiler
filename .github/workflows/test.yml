@@ -55,3 +55,15 @@ jobs:
           sudo apt-get install -y build-essential cmake
       - name: Build and run AST unit test
         run: make test-ast
+
+  semantic-unit-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install C++ build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+      - name: Build and run semantic unit test
+        run: make test-semantic
