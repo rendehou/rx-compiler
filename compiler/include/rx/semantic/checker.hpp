@@ -165,6 +165,12 @@ namespace rx::semantic {
             Scope& scope,
             CheckContext& context
         );
+
+        ExprResult checkPath(
+            const std::shared_ptr<ast::PathExpr>& expr,
+            Scope& scope,
+            CheckContext& context
+        );
     };
 
 } // namespace rx::semantic

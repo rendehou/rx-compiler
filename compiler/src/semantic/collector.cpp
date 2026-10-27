@@ -1,16 +1,23 @@
 #include "rx/semantic/collector.hpp"
+#include "rx/semantic/type.hpp"
 
 //collector负责存变量，函数，结构体名字并判断重复
 namespace rx::semantic{
-    //value存值和函数，struct存结构体]
+
+    //
+    
     std::unordered_map<std::string,std::shared_ptr<rx::ast::StructItem>> struct_map;
     std::unordered_map<std::string, ValueSymbol> value_map;
+    std::unordered_map< std::string, std::unordered_map<std::string, ValueSymbol>> associated_map;
+
     bool collectItems (
         const std::shared_ptr<rx::ast::Program> &program
     ) {
         value_map.clear();
         struct_map.clear();
+
         for(const auto& item : program->items) {
+
             if (auto function = std::dynamic_pointer_cast<rx::ast::FunctionItem>(item)) {//function
 
                 if (value_map.find(function->name) != value_map.end()) {
@@ -25,6 +32,7 @@ namespace rx::semantic{
 
                 continue;
             }
+
             if (auto const_value = std::dynamic_pointer_cast<rx::ast::ConstantItem>(item)) {//function
 
                 if (value_map.find(const_value->name) != value_map.end()) {
@@ -39,6 +47,7 @@ namespace rx::semantic{
 
                 continue;
             }
+
             if (auto structure = std::dynamic_pointer_cast<rx::ast::StructItem>(item)) {//function
 
                 if (struct_map.find(structure->name) != struct_map.end()) {
@@ -50,7 +59,14 @@ namespace rx::semantic{
 
                 continue;
             }
+        }   
+
+        // 第二次扫描，
+        for (const auto& item : program->items) {
+
+            
         }
+
         return true;
     }
 }

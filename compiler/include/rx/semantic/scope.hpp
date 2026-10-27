@@ -9,7 +9,7 @@ namespace rx::semantic {
 
     struct LocalSymbol {
         Type type;
-        bool mutable_binding = false;
+        bool mutable_binding = false;//是否可移动
     };
 
     class Scope {//作用域类，通过链表套unordered map模拟不同作用域
