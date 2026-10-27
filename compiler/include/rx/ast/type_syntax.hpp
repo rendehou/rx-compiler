@@ -8,11 +8,11 @@
 
 namespace rx::ast {
 
+// syntax主要保存语法节点，通过字符串先存储，先不进行解析，等到semantic再解析成对应内容
+
 struct TypeSyntax;
 struct GenericArgumentSyntax;
 
-// 路径中的一个段，直接继承 AstNode；来自 typePathSegment/pathExprSegment 等路径规则。
-// name 保存本段标识符，generic_arguments 保存紧随本段的泛型实参。
 struct PathSegment final : AstNode {
     PathSegment();
     ~PathSegment() override;
@@ -21,7 +21,6 @@ struct PathSegment final : AstNode {
     std::vector<std::shared_ptr<GenericArgumentSyntax>> generic_arguments;
 };
 
-// 完整路径节点，直接继承 AstNode；来自 typePath、pathInExpression 等规则。
 struct Path final : AstNode {
     Path();
     [[nodiscard]] AstChildren children() const override;
@@ -29,10 +28,8 @@ struct Path final : AstNode {
     std::vector<std::shared_ptr<PathSegment>> segments;
 };
 
-// 常量语法的具体形式标签。
 enum class ConstValueKind { Integer, Boolean, Path, Negate };
 
-// 常量值语法节点。
 struct ConstValueSyntax final : AstNode {
     ConstValueSyntax();
     ~ConstValueSyntax() override;
@@ -44,10 +41,8 @@ struct ConstValueSyntax final : AstNode {
     std::shared_ptr<ConstValueSyntax> operand;
 };
 
-// 类型语法的具体形式标签。
 enum class TypeSyntaxKind { Unit, Path, Reference, Array };
 
-// 类型语法节点。
 struct TypeSyntax final : AstNode {
     TypeSyntax();
     ~TypeSyntax() override;
@@ -61,10 +56,9 @@ struct TypeSyntax final : AstNode {
     std::shared_ptr<ConstValueSyntax> length;
 };
 
-// 泛型实参具体形式标签。
+
 enum class GenericArgumentKind { Lifetime, Type };
 
-// 泛型实参节点。
 struct GenericArgumentSyntax final : AstNode {
     GenericArgumentSyntax();
     [[nodiscard]] AstChildren children() const override;

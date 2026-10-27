@@ -76,7 +76,7 @@ namespace rx::semantic {
         bool operator!=(const Type& other) const;
 
     };
-    Type resolveType(//类型转换，把ast的类型转换成自然类型
+    Type resolveType(//类型转换，把ast的类型转换成自然类型，其中这个self_type用来标记，如果转换过程中出现self，它来自哪里
         const std::shared_ptr<rx::ast::TypeSyntax>& syntax,
         const std::string& self_type = ""
     );
