@@ -300,11 +300,7 @@ namespace rx::semantic {
 
             case ast::UnaryOperator::Negate: {
                 if (operand.type.isSignedInteger()) {//整数取负
-                    return {
-                        operand.type,
-                        false,
-                        false
-                    };
+                    return {operand.type, false, false};
                 }
 
                 return {Type::makeError()};
@@ -314,11 +310,7 @@ namespace rx::semantic {
                 //bool int，以及引用
                 if (operand.type.isBool() || operand.type.isInteger()) {
 
-                    return {
-                        operand.type,
-                        false,
-                        false
-                    };
+                    return {operand.type, false, false };
                 }
 
                 // 也允许 &bool 或 &integer
@@ -328,11 +320,7 @@ namespace rx::semantic {
                     (operand.type.inner->isBool() ||
                     operand.type.inner->isInteger())) {
 
-                    return {
-                        *operand.type.inner,
-                        false,
-                        false
-                    };
+                    return { *operand.type.inner, false, false};
                 }
 
                 return {Type::makeError()};
@@ -362,10 +350,7 @@ namespace rx::semantic {
 
             case ast::UnaryOperator::BorrowShared: {
                 return {
-                    Type::makeReference(
-                        operand.type,
-                        false
-                    ),
+                    Type::makeReference(operand.type, false),
                     false,
                     false
                 };
@@ -390,5 +375,393 @@ namespace rx::semantic {
             }
         }
     }
-    
+ //内部判断是否可以比较
+        bool canOrder(const Type& lhs, const Type& rhs) {
+            // 两侧类型完全相同，并且最终是整数或 bool
+            if (lhs == rhs) {
+                const Type* current = &lhs;
+
+                while (current->isReference()) {
+                    if (!current->inner) {
+                        return false;
+                    }
+                    current = current->inner.get();
+                }
+
+                if (current->isInteger() || current->isBool()) {
+                    return true;
+                }
+            }
+            // 特殊情况：左边是 &T，右边是 &mut T
+            if (lhs.isReference() && rhs.isReference() &&
+                !lhs.mutable_reference && rhs.mutable_reference &&
+                lhs.inner && rhs.inner &&
+                *lhs.inner == *rhs.inner) {
+                return true;
+            }
+
+            return false;
+        }
+
+        // 判断类型本身或经过多层引用后，最终是否为整数或 bool
+    bool isOrderedType(const Type& type) {
+        const Type* current = &type;
+
+        while (current->isReference()) {
+            if (!current->inner) {
+                return false;
+            }
+
+            current = current->inner.get();
+        }
+
+        return current->isInteger() || current->isBool();
+    }
+
+        // 判断左右两种类型能否进行大小比较
+    bool canCompareOrder(const Type& left, const Type& right) {
+        if (left == right && isOrderedType(left)) {
+            return true;
+        }
+
+            // 特殊情况：左侧是 &T，右侧是 &mut，需要判断内层
+        if (left.isReference() && right.isReference() &&
+            !left.mutable_reference && right.mutable_reference &&
+            left.inner && right.inner &&
+            *left.inner == *right.inner &&
+            isOrderedType(*left.inner)) {
+            return true;
+        }
+
+        return false;
+    }
+
+        // 判断类型是否支持 PartialEq
+    bool hasPartialEq(const Type& type) {
+        if (type.isInteger() || type.isBool()) {
+            return true;
+        }
+
+        // 引用、数组、Box、Vec 的内部类型也必须支持 PartialEq
+        if (type.isReference() || type.isArray() || type.isBox() || type.isVec()) {
+            if (!type.inner) {
+                return false;
+            }
+
+            return hasPartialEq(*type.inner);
+        }
+
+            // 结构体必须声明 derive(PartialEq)
+        if (type.isStruct()) {
+            auto it = struct_map.find(type.struct_name);
+
+            if (it == struct_map.end() || !it->second) {
+                return false;
+            }
+
+            for (const auto& attribute : it->second->attributes) {
+                if (!attribute) {
+                    continue;
+                }
+
+                for (auto trait : attribute->traits) {
+                    if (trait == ast::DeriveTrait::PartialEq) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+    ExprResult Checker::checkBinary(
+        const std::shared_ptr<ast::BinaryExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr || !expr->left || !expr->right) {
+            return {Type::makeError()};
+        }
+
+        // 递归检查左右子表达式
+        ExprResult left = checkExpr(expr->left, scope, context);
+        if (left.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        ExprResult right = checkExpr(expr->right, scope, context);
+        if (right.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        switch (expr->op) {
+
+            case ast::BinaryOperator::Add:
+            case ast::BinaryOperator::Subtract:
+            case ast::BinaryOperator::Multiply:
+            case ast::BinaryOperator::Divide:
+            case ast::BinaryOperator::Remainder: {
+                // 只接受整数或一层共享引用 &整数
+                Type left_type;
+                Type right_type;
+
+                if (!getIntegerOperandType(left.type, left_type) ||
+                    !getIntegerOperandType(right.type, right_type)) {
+                    return {Type::makeError()};
+                }
+
+                // 两侧必须是相同的整数类型
+                if (left_type != right_type) {
+                    return {Type::makeError()};
+                }
+
+                return {left_type, false, false};
+            }
+
+            case ast::BinaryOperator::BitAnd:
+            case ast::BinaryOperator::BitOr:
+            case ast::BinaryOperator::BitXor: {
+                // 允许整数或bool本身，或者一层共享引用 &T，但不允许& mut
+                Type left_type;
+                Type right_type;
+
+                if (!getScalarOperandType(left.type, left_type) ||
+                    !getScalarOperandType(right.type, right_type)) {
+                    return {Type::makeError()};
+                }
+
+                // 两侧必须是相同的整数或 bool 类型
+                if (left_type != right_type) {
+                    return {Type::makeError()};
+                }
+
+                return {left_type, false, false};
+            }
+
+            case ast::BinaryOperator::ShiftLeft:
+            case ast::BinaryOperator::ShiftRight: {
+                Type left_type;
+                Type right_type;
+
+                if (!getIntegerOperandType(left.type, left_type) ||
+                    !getIntegerOperandType(right.type, right_type)) {
+                    return {Type::makeError()};
+                }
+
+                // 两侧都必须是整数，但类型可以不同
+                return {left_type, false, false};
+            }
+
+            case ast::BinaryOperator::LogicalAnd:
+            case ast::BinaryOperator::LogicalOr: {
+                // 必须是 bool 本身，不接受引用
+                if (!left.type.isBool() || !right.type.isBool()) {
+                    return {Type::makeError()};
+                }
+
+                return {Type::makeBool(), false, false};
+            }
+
+            case ast::BinaryOperator::Equal:
+            case ast::BinaryOperator::NotEqual: {
+
+                if (left.type != right.type) {
+                    return {Type::makeError()};
+                }
+
+                // 判断类型是否实现 PartialEq，与eq有关
+                // 结构体必须显式derive PartialEq
+                if (!hasPartialEq(left.type)) {
+                    return {Type::makeError()};
+                }
+
+                return {Type::makeBool(), false, false};
+            }
+
+            case ast::BinaryOperator::Less:
+            case ast::BinaryOperator::LessEqual:
+            case ast::BinaryOperator::Greater:
+            case ast::BinaryOperator::GreaterEqual: {
+
+                // 判断类型本身或引用指向的最终类型是否为支持大小比较的整数/bool
+                if (!canCompareOrder(left.type, right.type)) {
+                    return {Type::makeError()};
+                }
+
+                return {Type::makeBool(), false, false};
+            }
+        }
+
+        return {Type::makeError()};
+    }
+
+     ExprResult Checker::checkAssignment(
+        const std::shared_ptr<ast::AssignmentExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr || !expr->place || !expr->value) {
+            return {Type::makeError()};
+        }
+
+        // 检查左侧
+        ExprResult place = checkExpr(
+            expr->place,
+            scope,
+            context
+        );
+
+        if (place.type.isError() || !place.is_assignable || !place.is_mutable) {
+            return {Type::makeError()};
+        }
+
+        // 检查右侧
+        ExprResult value = checkExpr(
+            expr->value,
+            scope,
+            context
+        );
+
+        if (value.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        switch (expr->op) {
+            // 普通赋值
+            case ast::AssignmentOperator::Assign: {
+                if (!isAssignmentCompatible(value.type, place.type)) {
+                    return {Type::makeError()};
+                }
+
+                return {Type::makeUnit(), false, false};
+            }
+
+            // 算术复合赋值
+            case ast::AssignmentOperator::Add:
+            case ast::AssignmentOperator::Subtract:
+            case ast::AssignmentOperator::Multiply:
+            case ast::AssignmentOperator::Divide:
+            case ast::AssignmentOperator::Remainder: {
+                if (!place.type.isInteger()) {
+                    return {Type::makeError()};
+                }
+
+                // 右侧永不返回时，不会实际执行运算
+                if (value.type.isNever()) {
+                    return {Type::makeUnit(), false, false};
+                }
+
+                Type right_type;
+
+                if (!getIntegerOperandType(
+                        value.type,
+                        right_type)) {
+                    return {Type::makeError()};
+                }
+
+                // 两侧必须是相同的整数类型
+                if (right_type != place.type) {
+                    return {Type::makeError()};
+                }
+
+                return {Type::makeUnit(), false, false};
+            }
+
+            // 位运算复合赋值
+            case ast::AssignmentOperator::BitAnd:
+            case ast::AssignmentOperator::BitOr:
+            case ast::AssignmentOperator::BitXor: {
+                if (!place.type.isInteger() &&
+                    !place.type.isBool()) {
+                    return {Type::makeError()};
+                }
+
+                if (value.type.isNever()) {
+                    return {Type::makeUnit(), false, false};
+                }
+
+                Type right_type;
+
+                if (!getScalarOperandType(
+                        value.type,
+                        right_type)) {
+                    return {Type::makeError()};
+                }
+
+                // 两侧必须是相同的整数或bool类型
+                if (right_type != place.type) {
+                    return {Type::makeError()};
+                }
+
+                return {Type::makeUnit(), false, false};
+            }
+
+            // 移位复合赋值
+            case ast::AssignmentOperator::ShiftLeft:
+            case ast::AssignmentOperator::ShiftRight: {
+                if (!place.type.isInteger()) {
+                    return {Type::makeError()};
+                }
+
+                if (value.type.isNever()) {
+                    return {Type::makeUnit(), false, false};
+                }
+
+                Type right_type;
+
+                if (!getIntegerOperandType(value.type, right_type)) {
+                    return {Type::makeError()};
+                }
+
+                // 右侧必须是整数，但不要求与左侧同类型
+                return {Type::makeUnit(), false, false};
+            }
+        }
+
+        return {Type::makeError()};
+    }
+
+    ExprResult Checker::checkCast(
+        const std::shared_ptr<ast::CastExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr || !expr->value || !expr->target_type) {
+            return {Type::makeError()};
+        }
+
+        // 检查待转换的表达式
+        ExprResult value = checkExpr(
+            expr->value, scope, context
+        );
+
+        if (value.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        // 解析目标类型
+        Type target_type = resolveType(
+            expr->target_type,
+            context.self_type
+        );
+
+        if (target_type.isError()) {
+            return {Type::makeError()};
+        }
+
+        // 目标类型必须是整数
+        if (!target_type.isInteger()) {
+            return {Type::makeError()};
+        }
+
+        // 源类型必须是整数或bool
+        if (!value.type.isInteger() && !value.type.isBool()) {
+            return {Type::makeError()};
+        }
+
+        // 返回转换后的类型
+        return {target_type, false, false};
+    }
 } // namespace rx::semantic

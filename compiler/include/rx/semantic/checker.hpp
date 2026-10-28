@@ -84,7 +84,44 @@ namespace rx::semantic {
             Scope& scope,
             CheckContext& context
         );
+        //辅助函数
+        // 获取整数或bool的实际类型，允许一层共享引用 &T
+        bool getScalarOperandType(
+            const Type& type,
+            Type& result
+        ) const;
 
+        // 获取整数的实际类型，允许一层共享引用 &T
+        bool getIntegerOperandType(
+            const Type& type,
+            Type& result
+        ) const;
+
+        // 判断类型本身或引用指向的最终类型是否为整数或bool
+        bool isOrderedType(const Type& type) const;
+
+        // 判断左右两种类型能否进行大小比较
+        bool canCompareOrder(
+            const Type& left,
+            const Type& right
+        ) const;
+
+        // 判断类型是否支持 PartialEq
+        bool hasPartialEq(const Type& type) const;
+
+        // 判断能否通过内置解引用到达目标类型
+        bool canReachByDereference(
+            const Type& from,
+            const Type& target,
+            bool require_mutable
+        ) const;
+
+        // 判断右侧类型能否赋给左侧类型
+        bool isAssignmentCompatible(
+            const Type& source,
+            const Type& target
+        ) const;
+        
         // 函数调用
         ExprResult checkCall(
             const std::shared_ptr<ast::CallExpr>& expr,
