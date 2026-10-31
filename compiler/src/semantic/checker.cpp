@@ -79,7 +79,8 @@ namespace rx::semantic {
     ExprResult Checker::checkBlock(
         const std::shared_ptr<ast::Block>& block,
         Scope& parent,
-        CheckContext& context
+        CheckContext& context,
+        const Type* expected_type
     ){
         if (!block) {
             return {Type::makeError()};
@@ -97,7 +98,7 @@ namespace rx::semantic {
 
         //如果有，就检查tail expression，否则是空类型
         if (block->tail) {
-            return checkExpr(block->tail, scope, context);
+            return checkExpr(block->tail, scope, context, expected_type);
         }
         return {Type::makeUnit()};
     }
@@ -107,7 +108,7 @@ namespace rx::semantic {
         Scope& scope,
         CheckContext& context
     ) {
-        
+
         if (!statement) {
             return false;
         } 
@@ -135,7 +136,12 @@ namespace rx::semantic {
 
             // 检查let等号右侧的初始化表达式
             if (let->initializer) {
-                ExprResult initializer = checkExpr(let->initializer, scope, context);
+                ExprResult initializer = checkExpr(
+                    let->initializer,
+                    scope,
+                    context,
+                    let->declared_type ? &variable_type : nullptr
+                );
 
                 if (initializer.type.isError()) {
                     return false;
@@ -178,15 +184,42 @@ namespace rx::semantic {
     ExprResult Checker::checkExpr(
         const std::shared_ptr<ast::Expr>& expr,
         Scope& scope,
-        CheckContext& context
+        CheckContext& context,
+        const Type* expected_type
     ) {
         if (!expr) {
             return {Type::makeError()};
         }
         // 以下几个种类可以直接解决
         // 具体数
-        if (std::dynamic_pointer_cast<ast::IntegerExpr>(expr)) {
-            return {Type::makeI32(), false, false};
+        if (auto integer = std::dynamic_pointer_cast<ast::IntegerExpr>(expr)) {
+            const std::string& spelling = integer->spelling;
+
+            Type integer_type = Type::makeI32();
+
+            // 显式后缀优先于预期类型
+            if (spelling.size() >= 5 &&
+                spelling.compare(spelling.size() - 5, 5, "usize") == 0) {
+                integer_type = Type::makeUSize();
+            }
+            else if (spelling.size() >= 5 &&
+                spelling.compare(spelling.size() - 5, 5, "isize") == 0) {
+                integer_type = Type::makeISize();
+            }
+            else if (spelling.size() >= 3 &&
+                spelling.compare(spelling.size() - 3, 3, "u32") == 0) {
+                integer_type = Type::makeU32();
+            }
+            else if (spelling.size() >= 3 &&
+                spelling.compare(spelling.size() - 3, 3, "i32") == 0) {
+                integer_type = Type::makeI32();
+            }
+            // 没有显式后缀时，使用预期类型
+            else if (expected_type && expected_type->isInteger()) {
+                integer_type = *expected_type;
+            }
+
+            return {integer_type, false, false};
         }
 
         // bool
@@ -214,15 +247,15 @@ namespace rx::semantic {
             return checkBlock(
                 block_expr->block,
                 scope,
-                context
+                context,
+                expected_type
             );
         }
 
 
         return {Type::makeError()};
     }
-
-    ExprResult Checker::checkPath(
+        ExprResult Checker::checkPath(
         const std::shared_ptr<ast::PathExpr>& expr,
         Scope& scope,
         CheckContext& context
@@ -375,35 +408,37 @@ namespace rx::semantic {
             }
         }
     }
- //内部判断是否可以比较
-        bool canOrder(const Type& lhs, const Type& rhs) {
-            // 两侧类型完全相同，并且最终是整数或 bool
-            if (lhs == rhs) {
-                const Type* current = &lhs;
 
-                while (current->isReference()) {
-                    if (!current->inner) {
-                        return false;
-                    }
-                    current = current->inner.get();
-                }
 
-                if (current->isInteger() || current->isBool()) {
-                    return true;
+    //内部判断是否可以比较，这里是辅助函数
+    bool canOrder(const Type& lhs, const Type& rhs) {
+        // 两侧类型完全相同，并且最终是整数或 bool
+        if (lhs == rhs) {
+            const Type* current = &lhs;
+
+            while (current->isReference()) {
+                if (!current->inner) {
+                    return false;
                 }
+                current = current->inner.get();
             }
-            // 特殊情况：左边是 &T，右边是 &mut T
-            if (lhs.isReference() && rhs.isReference() &&
-                !lhs.mutable_reference && rhs.mutable_reference &&
-                lhs.inner && rhs.inner &&
-                *lhs.inner == *rhs.inner) {
+
+            if (current->isInteger() || current->isBool()) {
                 return true;
             }
-
-            return false;
+        }
+        // 特殊情况：左边是 &T，右边是 &mut T
+        if (lhs.isReference() && rhs.isReference() &&
+            !lhs.mutable_reference && rhs.mutable_reference &&
+            lhs.inner && rhs.inner &&
+            *lhs.inner == *rhs.inner) {
+            return true;
         }
 
-        // 判断类型本身或经过多层引用后，最终是否为整数或 bool
+        return false;
+    }
+
+    // 判断类型本身或经过多层引用后，最终是否为整数或 bool
     bool isOrderedType(const Type& type) {
         const Type* current = &type;
 
@@ -418,13 +453,13 @@ namespace rx::semantic {
         return current->isInteger() || current->isBool();
     }
 
-        // 判断左右两种类型能否进行大小比较
+    // 判断左右两种类型能否进行大小比较
     bool canCompareOrder(const Type& left, const Type& right) {
         if (left == right && isOrderedType(left)) {
             return true;
         }
 
-            // 特殊情况：左侧是 &T，右侧是 &mut，需要判断内层
+        // 特殊情况：左侧是 &T，右侧是 &mut，需要判断内层
         if (left.isReference() && right.isReference() &&
             !left.mutable_reference && right.mutable_reference &&
             left.inner && right.inner &&
@@ -436,7 +471,7 @@ namespace rx::semantic {
         return false;
     }
 
-        // 判断类型是否支持 PartialEq
+    // 判断类型是否支持 PartialEq
     bool hasPartialEq(const Type& type) {
         if (type.isInteger() || type.isBool()) {
             return true;
@@ -451,7 +486,7 @@ namespace rx::semantic {
             return hasPartialEq(*type.inner);
         }
 
-            // 结构体必须声明 derive(PartialEq)
+        // 结构体必须声明 derive(PartialEq)
         if (type.isStruct()) {
             auto it = struct_map.find(type.struct_name);
 
@@ -476,6 +511,7 @@ namespace rx::semantic {
 
         return false;
     }
+
     ExprResult Checker::checkBinary(
         const std::shared_ptr<ast::BinaryExpr>& expr,
         Scope& scope,
@@ -596,8 +632,7 @@ namespace rx::semantic {
 
         return {Type::makeError()};
     }
-
-     ExprResult Checker::checkAssignment(
+         ExprResult Checker::checkAssignment(
         const std::shared_ptr<ast::AssignmentExpr>& expr,
         Scope& scope,
         CheckContext& context
@@ -618,10 +653,18 @@ namespace rx::semantic {
         }
 
         // 检查右侧
+        const Type* expected_value_type = nullptr;
+
+        if (expr->op != ast::AssignmentOperator::ShiftLeft &&
+            expr->op != ast::AssignmentOperator::ShiftRight) {
+            expected_value_type = &place.type;
+        }
+
         ExprResult value = checkExpr(
             expr->value,
             scope,
-            context
+            context,
+            expected_value_type
         );
 
         if (value.type.isError()) {
@@ -763,5 +806,363 @@ namespace rx::semantic {
 
         // 返回转换后的类型
         return {target_type, false, false};
+    }
+
+    ExprResult Checker::checkFieldAccess(//a.b
+        const std::shared_ptr<ast::FieldAccessExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr || !expr->base || expr->field.empty()) {
+            return {Type::makeError()};
+        }
+
+        // 检查base
+        ExprResult base = checkExpr(
+            expr->base,
+            scope,
+            context
+        );
+
+        if (base.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        Type current_type = base.type;
+
+        // 普通对象：是否可修改来自base本身
+        // value expression：会形成temporary，可以修改
+        bool mutable_access;
+
+        if (base.is_assignable) {
+            mutable_access = base.is_mutable;
+        } else {
+            mutable_access = true;
+        }
+
+        // 记录是否经过共享引用
+        bool crossed_shared = base.mutable_access_blocked;
+
+        if (crossed_shared) {
+            mutable_access = false;
+        }
+
+        // 不断自动解引用，直到找到struct
+        while (!current_type.isStruct()) {
+
+            if (!dereferenceForAccess(
+                    current_type,
+                    mutable_access,
+                    crossed_shared)) {
+                return {Type::makeError()};
+            }
+        }
+
+        // 找struct定义
+        auto structure = struct_map.find(current_type.struct_name);
+        if (structure == struct_map.end() || !structure->second) {
+            return {Type::makeError()};
+        }
+
+        // 找字段，structure是存储struct里面字段的map
+        for (const auto& field : structure->second->fields) {
+
+            if (!field || !field->type) {
+                continue;
+            }
+
+            if (field->name == expr->field) {
+
+                Type field_type = resolveType(
+                    field->type,
+                    current_type.struct_name
+                );
+
+                if (field_type.isError()) {
+                    return {Type::makeError()};
+                }
+
+                return {
+                    field_type,
+                    true,
+                    mutable_access,
+                    crossed_shared
+                };
+            }
+        }
+
+        // 字段不存在
+        return {Type::makeError()};
+    }
+        // 判断能否通过内置解引用到达目标类型
+    bool Checker::canReachByDereference(
+        const Type& from,
+        const Type& target,
+        bool require_mutable
+    ) const {
+        Type current = from;
+
+        while (true) {
+            if (current == target) {
+                return true;
+            }
+
+            if (current.isReference() && current.inner) {
+                if (require_mutable && !current.mutable_reference) {
+                    return false;
+                }
+
+                current = *current.inner;
+                continue;
+            }
+
+            if (current.isBox() && current.inner) {
+                current = *current.inner;
+                continue;
+            }
+
+            return false;
+        }
+}
+
+
+    // 判断右侧类型能否赋给左侧类型
+    bool Checker::isAssignmentCompatible(
+        const Type& source,
+        const Type& target
+    ) const {
+        if (source.isNever() || source == target) {
+            return true;
+        }
+
+        // 只允许引用之间的自动借用调整
+        if (!source.isReference() || !target.isReference() ||
+            !source.inner || !target.inner) {
+            return false;
+        }
+
+        // 目标需要可变引用时，源也必须是可变引用
+        if (target.mutable_reference && !source.mutable_reference) {
+            return false;
+        }
+
+        return canReachByDereference(
+            *source.inner,
+            *target.inner,
+            target.mutable_reference
+        );
+    }
+
+
+    // 自动解引用一层，并更新修改权限
+    bool Checker::dereferenceForAccess(
+        Type& type,
+        bool& mutable_access,
+        bool& mutable_access_blocked
+    ) const {
+        // Reference
+        if (type.isReference() && type.inner) {
+
+            if (!type.mutable_reference) {
+                mutable_access = false;
+                mutable_access_blocked = true;
+            } else if (!mutable_access_blocked) {
+                mutable_access = true;
+            }
+
+            type = *type.inner;
+            return true;
+        }
+
+        // Box
+        if (type.isBox() && type.inner) {
+            type = *type.inner;
+            return true;
+        }
+
+        return false;
+    }
+
+
+    // 判断类型是否实现Copy
+    bool Checker::hasCopy(const Type& type) const {
+
+        if (type.isInteger() || type.isBool() || type.isUnit()) {
+            return true;
+        }
+
+        // 共享引用可以Copy，可变引用不可以
+        if (type.isReference()) {
+            return type.inner && !type.mutable_reference;
+        }
+
+        // 数组的元素必须实现Copy
+        if (type.isArray()) {
+            return type.inner && hasCopy(*type.inner);
+        }
+
+        // Box和Vec不支持Copy
+        if (type.isBox() || type.isVec()) {
+            return false;
+        }
+
+        // 结构体必须同时derive Copy和Clone
+        if (type.isStruct()) {
+            auto structure = struct_map.find(type.struct_name);
+
+            if (structure == struct_map.end() || !structure->second) {
+                return false;
+            }
+
+            bool has_copy = false;
+            bool has_clone = false;
+
+            for (const auto& attribute : structure->second->attributes) {
+                if (!attribute) {
+                    continue;
+                }
+
+                for (auto trait : attribute->traits) {
+                    if (trait == ast::DeriveTrait::Copy) {
+                        has_copy = true;
+                    }
+
+                    if (trait == ast::DeriveTrait::Clone) {
+                        has_clone = true;
+                    }
+                }
+            }
+
+            if (!has_copy || !has_clone) {
+                return false;
+            }
+
+            // 所有字段也必须实现Copy
+            for (const auto& field : structure->second->fields) {
+                if (!field || !field->type) {
+                    return false;
+                }
+
+                Type field_type = resolveType(
+                    field->type,
+                    type.struct_name
+                );
+
+                if (field_type.isError() || !hasCopy(field_type)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    ExprResult Checker::checkIndex(
+        const std::shared_ptr<ast::IndexExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr || !expr->base || !expr->index) {
+            return {Type::makeError()};
+        }
+
+        // 检查base
+        ExprResult base = checkExpr(
+            expr->base,
+            scope,
+            context
+        );
+
+        if (base.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        // 检查index
+        // 注意：这里需要给checkExpr增加expected_type支持，
+        // 使无后缀的整数索引按照usize推断
+
+        Type usize_type = Type::makeUSize();
+
+        ExprResult index = checkExpr(
+            expr->index,
+            scope,
+            context,
+            &usize_type
+        );
+
+        if (index.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        // index必须是usize
+        if (!index.type.isNever() && index.type != usize_type) {
+            return {Type::makeError()};
+        }
+
+        // never类型不会产生正常的索引结果
+        if (index.type.isNever()) {
+            return {Type::makeNever()};
+        }
+
+        Type current_type = base.type;
+
+        // 普通place继承原来的修改权限，临时值可以修改
+        bool mutable_access = base.is_assignable
+            ? base.is_mutable
+            : true;
+
+        bool crossed_shared = base.mutable_access_blocked;
+
+        if (crossed_shared) {
+            mutable_access = false;
+        }
+
+        // 自动解引用，直到找到Array或Vec
+        while (!current_type.isArray() && !current_type.isVec()) {
+
+            if (!dereferenceForAccess(
+                    current_type,
+                    mutable_access,
+                    crossed_shared)) {
+                return {Type::makeError()};
+            }
+        }
+
+        // 检查inner，取得元素类型
+        if (!current_type.inner) {
+            return {Type::makeError()};
+        }
+
+        Type element_type = *current_type.inner;
+
+        // Array索引不额外引入借用，直接继承原来的修改权限
+        if (current_type.isArray()) {
+            return {
+                element_type,
+                true,
+                mutable_access,
+                crossed_shared
+            };
+        }
+
+        // Vec索引会隐式借用Vec
+        // 如果Vec本身不能修改，那么通过索引得到的元素也不能进行修改
+        if (current_type.isVec()) {
+
+            if (!mutable_access) {
+                crossed_shared = true;
+            }
+
+            return {
+                element_type,
+                true,
+                mutable_access,
+                crossed_shared
+            };
+        }
+
+        return {Type::makeError()};
     }
 } // namespace rx::semantic

@@ -17,7 +17,7 @@ namespace rx::semantic {
 
         bool is_assignable = false;//能否作左值
         bool is_mutable = false;//能否mut
-
+        bool mutable_access_blocked = false;// 判断是否因为只读而失去赋值能力
     };
 
     struct CheckContext {
@@ -44,7 +44,8 @@ namespace rx::semantic {
         ExprResult checkBlock(
             const std::shared_ptr<ast::Block>& block,
             Scope& parent,
-            CheckContext& context
+            CheckContext& context,
+            const Type* expected_type = nullptr
         );
 
         bool checkStatement(
@@ -56,7 +57,8 @@ namespace rx::semantic {
         ExprResult checkExpr(
             const std::shared_ptr<ast::Expr>& expr,
             Scope& scope,
-            CheckContext& context
+            CheckContext& context,
+            const Type* expected_type =nullptr
         );
 
 
@@ -136,6 +138,23 @@ namespace rx::semantic {
         );
 
         // 数组和结构体
+        bool dereferenceForAccess(
+            Type& type,
+            bool& mutable_access,
+            bool& crossed_shared
+        ) const;
+
+        // 自动解引用一层Reference或Box，并更新修改权限
+        bool dereferenceForAccess(
+            Type& type,
+            bool& mutable_access,
+            bool& mutable_access_blocked
+        ) const;
+
+        // 判断类型是否实现Copy
+        bool hasCopy(const Type& type) const;
+
+
         ExprResult checkFieldAccess(
             const std::shared_ptr<ast::FieldAccessExpr>& expr,
             Scope& scope,
