@@ -9,6 +9,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace rx::semantic {
 
@@ -16,7 +17,7 @@ namespace rx::semantic {
         Type type;
 
         bool is_assignable = false;//能否作左值
-        bool is_mutable = false;//能否mut
+        bool is_mutable = false;//能否mut，只有写mut才能赋值，因为引用可以有很多副本，但赋值相当于操作变量所有权，只有一个
         bool mutable_access_blocked = false;// 判断是否因为只读而失去赋值能力
     };
 
@@ -25,8 +26,13 @@ namespace rx::semantic {
         Type return_type = Type::makeUnit();
 
         std::string self_type;
+        std::vector<LoopContext> loops;
     };
-
+    struct LoopContext {
+        bool allow_value_break = false;
+        const Type* expected_type = nullptr;
+        
+    };
     class Checker {
     public:
         // 整个函数体检查阶段的入口
@@ -93,7 +99,7 @@ namespace rx::semantic {
             Type& result
         ) const;
 
-        // 获取整数的实际类型，允许一层共享引用 &T
+        // 去掉外壳，保留最内层类型，允许共享引用 &T
         bool getIntegerOperandType(
             const Type& type,
             Type& result
@@ -119,7 +125,7 @@ namespace rx::semantic {
         ) const;
 
         // 判断右侧类型能否赋给左侧类型
-        bool isAssignmentCompatible(
+        bool canAssignment(
             const Type& source,
             const Type& target
         ) const;
@@ -138,11 +144,6 @@ namespace rx::semantic {
         );
 
         // 数组和结构体
-        bool dereferenceForAccess(
-            Type& type,
-            bool& mutable_access,
-            bool& crossed_shared
-        ) const;
 
         // 自动解引用一层Reference或Box，并更新修改权限
         bool dereferenceForAccess(
@@ -189,7 +190,8 @@ namespace rx::semantic {
         ExprResult checkIf(
             const std::shared_ptr<ast::IfExpr>& expr,
             Scope& scope,
-            CheckContext& context
+            CheckContext& context,
+            const Type* expected_type = nullptr
         );
 
         ExprResult checkWhile(

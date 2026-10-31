@@ -2,6 +2,7 @@
 
 #include "rx/semantic/checker.hpp"
 #include "rx/semantic/collector.hpp"
+#include "rx/semantic/constevaluator.hpp"
 
 #include <memory>
 #include <string>
@@ -632,7 +633,8 @@ namespace rx::semantic {
 
         return {Type::makeError()};
     }
-         ExprResult Checker::checkAssignment(
+
+    ExprResult Checker::checkAssignment(
         const std::shared_ptr<ast::AssignmentExpr>& expr,
         Scope& scope,
         CheckContext& context
@@ -655,8 +657,8 @@ namespace rx::semantic {
         // 检查右侧
         const Type* expected_value_type = nullptr;
 
-        if (expr->op != ast::AssignmentOperator::ShiftLeft &&
-            expr->op != ast::AssignmentOperator::ShiftRight) {
+        // 除了左右移位，这个赋值都应该类型相同
+        if (expr->op != ast::AssignmentOperator::ShiftLeft && expr->op != ast::AssignmentOperator::ShiftRight) {
             expected_value_type = &place.type;
         }
 
@@ -674,7 +676,8 @@ namespace rx::semantic {
         switch (expr->op) {
             // 普通赋值
             case ast::AssignmentOperator::Assign: {
-                if (!isAssignmentCompatible(value.type, place.type)) {
+
+                if (!canAssignment(value.type, place.type)) {
                     return {Type::makeError()};
                 }
 
@@ -698,9 +701,7 @@ namespace rx::semantic {
 
                 Type right_type;
 
-                if (!getIntegerOperandType(
-                        value.type,
-                        right_type)) {
+                if (!getIntegerOperandType(value.type, right_type)) {
                     return {Type::makeError()};
                 }
 
@@ -716,8 +717,7 @@ namespace rx::semantic {
             case ast::AssignmentOperator::BitAnd:
             case ast::AssignmentOperator::BitOr:
             case ast::AssignmentOperator::BitXor: {
-                if (!place.type.isInteger() &&
-                    !place.type.isBool()) {
+                if (!place.type.isInteger() && !place.type.isBool()) {
                     return {Type::makeError()};
                 }
 
@@ -727,9 +727,7 @@ namespace rx::semantic {
 
                 Type right_type;
 
-                if (!getScalarOperandType(
-                        value.type,
-                        right_type)) {
+                if (!getScalarOperandType(value.type, right_type)) {
                     return {Type::makeError()};
                 }
 
@@ -808,7 +806,7 @@ namespace rx::semantic {
         return {target_type, false, false};
     }
 
-    ExprResult Checker::checkFieldAccess(//a.b
+    ExprResult Checker::checkFieldAccess(//a.b，先检查，然后找a，直到找到一个struct，再在struct内部找是否存在方法
         const std::shared_ptr<ast::FieldAccessExpr>& expr,
         Scope& scope,
         CheckContext& context
@@ -828,13 +826,10 @@ namespace rx::semantic {
             return {Type::makeError()};
         }
 
-        Type current_type = base.type;
-
-        // 普通对象：是否可修改来自base本身
-        // value expression：会形成temporary，可以修改
+        Type current_type = base.type;//从这个开始不断解引用得到内层
         bool mutable_access;
 
-        if (base.is_assignable) {
+        if (base.is_assignable) {//是实际存储位置
             mutable_access = base.is_mutable;
         } else {
             mutable_access = true;
@@ -842,18 +837,13 @@ namespace rx::semantic {
 
         // 记录是否经过共享引用
         bool crossed_shared = base.mutable_access_blocked;
-
         if (crossed_shared) {
             mutable_access = false;
         }
 
         // 不断自动解引用，直到找到struct
         while (!current_type.isStruct()) {
-
-            if (!dereferenceForAccess(
-                    current_type,
-                    mutable_access,
-                    crossed_shared)) {
+            if (!dereferenceForAccess(current_type, mutable_access, crossed_shared)) {
                 return {Type::makeError()};
             }
         }
@@ -894,7 +884,8 @@ namespace rx::semantic {
         // 字段不存在
         return {Type::makeError()};
     }
-        // 判断能否通过内置解引用到达目标类型
+
+    // 判断能否通过解引用到达目标类型
     bool Checker::canReachByDereference(
         const Type& from,
         const Type& target,
@@ -927,7 +918,7 @@ namespace rx::semantic {
 
 
     // 判断右侧类型能否赋给左侧类型
-    bool Checker::isAssignmentCompatible(
+    bool Checker::canAssignment(
         const Type& source,
         const Type& target
     ) const {
@@ -935,13 +926,11 @@ namespace rx::semantic {
             return true;
         }
 
-        // 只允许引用之间的自动借用调整
-        if (!source.isReference() || !target.isReference() ||
-            !source.inner || !target.inner) {
+        // 允许一个引用的差别
+        if (!source.isReference() || !target.isReference() || !source.inner || !target.inner) {
             return false;
         }
-
-        // 目标需要可变引用时，源也必须是可变引用
+        // 都必须是可变引用
         if (target.mutable_reference && !source.mutable_reference) {
             return false;
         }
@@ -966,7 +955,7 @@ namespace rx::semantic {
             if (!type.mutable_reference) {
                 mutable_access = false;
                 mutable_access_blocked = true;
-            } else if (!mutable_access_blocked) {
+            } else if (!mutable_access_blocked) {//经过了一层引用就还是不能赋值
                 mutable_access = true;
             }
 
@@ -1080,9 +1069,6 @@ namespace rx::semantic {
         }
 
         // 检查index
-        // 注意：这里需要给checkExpr增加expected_type支持，
-        // 使无后缀的整数索引按照usize推断
-
         Type usize_type = Type::makeUSize();
 
         ExprResult index = checkExpr(
@@ -1101,17 +1087,15 @@ namespace rx::semantic {
             return {Type::makeError()};
         }
 
-        // never类型不会产生正常的索引结果
+        // index是never类型不会产生正常的索引结果
         if (index.type.isNever()) {
             return {Type::makeNever()};
         }
 
         Type current_type = base.type;
 
-        // 普通place继承原来的修改权限，临时值可以修改
-        bool mutable_access = base.is_assignable
-            ? base.is_mutable
-            : true;
+        // 检查mutable权限
+        bool mutable_access = base.is_assignable ? base.is_mutable : true;
 
         bool crossed_shared = base.mutable_access_blocked;
 
@@ -1122,10 +1106,7 @@ namespace rx::semantic {
         // 自动解引用，直到找到Array或Vec
         while (!current_type.isArray() && !current_type.isVec()) {
 
-            if (!dereferenceForAccess(
-                    current_type,
-                    mutable_access,
-                    crossed_shared)) {
+            if (!dereferenceForAccess(current_type, mutable_access, crossed_shared)) {
                 return {Type::makeError()};
             }
         }
@@ -1137,7 +1118,7 @@ namespace rx::semantic {
 
         Type element_type = *current_type.inner;
 
-        // Array索引不额外引入借用，直接继承原来的修改权限
+        // Array索引继承修改权限
         if (current_type.isArray()) {
             return {
                 element_type,
@@ -1147,7 +1128,6 @@ namespace rx::semantic {
             };
         }
 
-        // Vec索引会隐式借用Vec
         // 如果Vec本身不能修改，那么通过索引得到的元素也不能进行修改
         if (current_type.isVec()) {
 
@@ -1164,5 +1144,488 @@ namespace rx::semantic {
         }
 
         return {Type::makeError()};
+    }
+
+
+    ExprResult Checker::checkArrayList(
+        const std::shared_ptr<ast::ArrayListExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr) {
+            return {Type::makeError()};
+        }
+
+        Type element_type = Type::makeError();
+
+        bool has_element = false;
+        bool fasan = false;
+
+        std::vector<Type> previous_types;
+
+        // 逐个检查数组元素
+        for (const auto& element : expr->elements) {
+
+            if (!element) {
+                return {Type::makeError()};
+            }
+
+            ExprResult result = checkExpr(
+                element,
+                scope,
+                context
+            );
+
+            if (result.type.isError()) {
+                return {Type::makeError()};
+            }
+
+            // never不参与共同类型推断
+            if (result.type.isNever()) {
+                fasan = true;
+                continue;
+            }
+
+            // 第一个元素直接作为初始类型
+            if (!has_element) {
+                element_type = result.type;
+                has_element = true;
+            }
+            else {
+
+                // 当前元素可以赋给已有类型
+                if (canAssignment(result.type, element_type)) {
+                    // 保持原来的类型
+                }
+
+                // 尝试使用当前元素的类型作为新的共同类型
+                else if (canAssignment(element_type, result.type)) {
+
+                    // 之前所有元素也必须能够转换为新类型
+                    for (const auto& previous : previous_types) {
+                        if (!canAssignment(previous, result.type)) {
+                            return {Type::makeError()};
+                        }
+                    }
+
+                    element_type = result.type;
+                }
+                else {
+                    return {Type::makeError()};
+                }
+            }
+
+            previous_types.push_back(result.type);
+        }
+
+        // 有元素发散，整个数组表达式发散
+        if (fasan) {
+            return {Type::makeNever()};
+        }
+
+        // 空数组无法推断元素类型
+        if (!has_element) {
+            return {Type::makeError()};
+        }
+
+        return {
+            Type::makeArray(element_type, static_cast<std::uint64_t>(expr->elements.size())),
+            false,
+            false
+        };
+    }
+
+    ExprResult Checker::checkArrayRepeat(
+        const std::shared_ptr<ast::ArrayRepeatExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr || !expr->element || !expr->count) {
+            return {Type::makeError()};
+        }
+
+        // 计算数组长度
+        ConstEvaluator evaluator;
+        ConstValue count_value;
+
+        Type usize_type = Type::makeUSize();
+
+        if (!evaluator.evaluateValue(expr->count, usize_type, count_value)) {
+            return {Type::makeError()};
+        }
+
+        std::uint64_t count = count_value.unsigned_value;
+
+        // 检查重复的元素
+        ExprResult element = checkExpr(
+            expr->element,
+            scope,
+            context
+        );
+
+        if (element.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        // 元素表达式发散，整个数组表达式发散
+        if (element.type.isNever()) {
+            return {Type::makeNever()};
+        }
+
+        // 重复次数大于1时，元素必须实现Copy
+        if (count > 1 && !hasCopy(element.type)) {
+            return {Type::makeError()};
+        }
+
+        return {
+            Type::makeArray(element.type, count),
+            false,
+            false
+        };
+    }
+
+    ExprResult Checker::checkStructInit(
+        const std::shared_ptr<ast::StructInitExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr || !expr->path || expr->path->segments.empty()) {
+            return {Type::makeError()};
+        }
+
+        // 检查path
+        for (const auto& segment : expr->path->segments) {
+            if (!segment) {
+                return {Type::makeError()};
+            }
+        }
+
+        // 当前只支持单段结构体路径
+        if (expr->path->segments.size() != 1) {
+            return {Type::makeError()};
+        }
+
+        std::string struct_name = expr->path->segments[0]->name;
+
+        // Self
+        if (struct_name == "Self") {
+            if (context.self_type.empty()) {
+                return {Type::makeError()};
+            }
+
+            struct_name = context.self_type;
+        }
+
+        // 找struct定义
+        auto structure = struct_map.find(struct_name);
+
+        if (structure == struct_map.end() || !structure->second) {
+            return {Type::makeError()};
+        }
+
+        std::vector<std::string> initialized_fields;
+
+        bool has_never = false;
+
+        // 检查每一个初始化字段
+        for (const auto& initializer : expr->fields) {
+
+            if (!initializer || initializer->name.empty() || !initializer->value) {
+                return {Type::makeError()};
+            }
+
+            // 检查字段是否重复
+            for (const auto& name : initialized_fields) {
+                if (name == initializer->name) {
+                    return {Type::makeError()};
+                }
+            }
+
+            // 找字段定义
+            std::shared_ptr<ast::StructField> field_definition;
+
+            for (const auto& field : structure->second->fields) {
+
+                if (!field || !field->type) {
+                    return {Type::makeError()};
+                }
+
+                if (field->name == initializer->name) {
+                    field_definition = field;
+                    break;
+                }
+            }
+
+            // 字段不存在
+            if (!field_definition) {
+                return {Type::makeError()};
+            }
+
+            // 解析字段类型
+            Type field_type = resolveType(
+                field_definition->type,
+                struct_name
+            );
+
+            if (field_type.isError()) {
+                return {Type::makeError()};
+            }
+
+            // 检查字段值
+            ExprResult value = checkExpr(
+                initializer->value,
+                scope,
+                context,
+                &field_type
+            );
+
+            if (value.type.isError()) {
+                return {Type::makeError()};
+            }
+
+            // 字段值必须能够赋给字段类型
+            if (!canAssignment(value.type, field_type)) {
+                return {Type::makeError()};
+            }
+
+            if (value.type.isNever()) {
+                has_never = true;
+            }
+
+            initialized_fields.push_back(initializer->name);
+        }
+
+        // 检查是否所有字段都已经初始化
+        for (const auto& field : structure->second->fields) {
+
+            if (!field || !field->type || field->name.empty()) {
+                return {Type::makeError()};
+            }
+
+            bool initialized = false;
+
+            for (const auto& name : initialized_fields) {
+                if (name == field->name) {
+                    initialized = true;
+                    break;
+                }
+            }
+
+            if (!initialized) {
+                return {Type::makeError()};
+            }
+        }
+
+        // 如果字段初始化过程中发散，整个表达式也发散
+        if (has_never) {
+            return {Type::makeNever()};
+        }
+
+        return {Type::makeStruct(struct_name), false, false};
+    }
+
+    ExprResult Checker::checkIf(
+        const std::shared_ptr<ast::IfExpr>& expr,
+        Scope& scope,
+        CheckContext& context,
+        const Type* expected_type
+    ) {
+        if (!expr || !expr->condition || !expr->then_block) {
+            return {Type::makeError()};
+        }
+
+        // 检查condition
+        Type bool_type = Type::makeBool();
+
+        ExprResult condition = checkExpr(
+            expr->condition,
+            scope,
+            context,
+            &bool_type
+        );
+
+        if (condition.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        if (!condition.type.isNever() && !condition.type.isBool()) {
+            return {Type::makeError()};
+        }
+
+        // 没有else
+        if (!expr->else_branch) {
+
+            Type unit_type = Type::makeUnit();
+
+            ExprResult then_result = checkBlock(
+                expr->then_block,
+                scope,
+                context,
+                &unit_type
+            );
+
+            if (then_result.type.isError()) {
+                return {Type::makeError()};
+            }
+
+            // then必须是Unit或者Never
+            if (!then_result.type.isNever() &&
+                !then_result.type.isUnit()) {
+                return {Type::makeError()};
+            }
+
+            if (condition.type.isNever()) {
+                return {Type::makeNever()};
+            }
+
+            if (expected_type && !canAssignment(unit_type, *expected_type)) {
+                return {Type::makeError()};
+            }
+
+            return {Type::makeUnit(), false, false};
+        }
+
+        // 检查then
+        ExprResult then_result = checkBlock(
+            expr->then_block,
+            scope,
+            context,
+            expected_type
+        );
+
+        if (then_result.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        // 检查else
+        ExprResult else_result = checkExpr(
+            expr->else_branch,
+            scope,
+            context,
+            expected_type
+        );
+
+        if (else_result.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        // 两个分支都发散
+        if (then_result.type.isNever() && else_result.type.isNever()) {
+            return {Type::makeNever()};
+        }
+
+        // 有预期类型
+        if (expected_type) {
+
+            if (!canAssignment(then_result.type, *expected_type) ||
+                !canAssignment(else_result.type, *expected_type)) {
+                return {Type::makeError()};
+            }
+
+            if (condition.type.isNever()) {
+                return {Type::makeNever()};
+            }
+
+            return {*expected_type, false, false};
+        }
+
+        Type result_type;
+
+        // then发散，使用else的类型
+        if (then_result.type.isNever()) {
+            result_type = else_result.type;
+        }
+
+        // else发散，使用then的类型
+        else if (else_result.type.isNever()) {
+            result_type = then_result.type;
+        }
+
+        // 两个类型相同
+        else if (then_result.type == else_result.type) {
+            result_type = then_result.type;
+        }
+
+        // else可以赋给then
+        else if (canAssignment(else_result.type, then_result.type)) {
+            result_type = then_result.type;
+        }
+
+        // then可以赋给else
+        else if (canAssignment(then_result.type, else_result.type)) {
+            result_type = else_result.type;
+        }
+
+        else {
+            return {Type::makeError()};
+        }
+
+        if (condition.type.isNever()) {
+            return {Type::makeNever()};
+        }
+
+        return {result_type, false, false};
+    }
+
+    ExprResult Checker::checkWhile(
+        const std::shared_ptr<ast::WhileExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr || !expr->condition || !expr->body) {
+            return {Type::makeError()};
+        }
+
+        // 检查condition
+        Type bool_type = Type::makeBool();
+
+        ExprResult condition = checkExpr(
+            expr->condition,
+            scope,
+            context,
+            &bool_type
+        );
+
+        if (condition.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        if (!condition.type.isNever() && !condition.type.isBool()) {
+            return {Type::makeError()};
+        }
+
+        // 进入while循环
+        LoopContext loop;
+        loop.allow_value_break = false;
+
+        context.loops.push_back(loop);
+
+        // 检查body
+        Type unit_type = Type::makeUnit();
+
+        ExprResult body = checkBlock(
+            expr->body,
+            scope,
+            context,
+            &unit_type
+        );
+
+        // 离开while循环
+        context.loops.pop_back();
+
+        if (body.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        // body必须是Unit或者Never
+        if (!body.type.isNever() && !body.type.isUnit()) {
+            return {Type::makeError()};
+        }
+
+        if (condition.type.isNever()) {
+            return {Type::makeNever()};
+        }
+
+        return {Type::makeUnit(), false, false};
     }
 } // namespace rx::semantic
