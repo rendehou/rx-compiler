@@ -1,33 +1,35 @@
-# Fill in these five commands. See README-EN.md or README-ZH.md for details.
+# The Online Judge invokes these commands through "make test".
+# BUILD compiles the C++ compiler once. If Cargo is available, it also builds
+# the Rust reference runtime used by the default IR/CODEGEN commands.
 
-# Optional: build your compiler once before testing. Leave empty if prebuilt.
-# {runtime} will be linked into every program.
-# Write shared runtime assembly there if your IR/CODEGEN output references it.
-BUILD = CARGO_PROFILE_RELEASE_LTO=true cargo build --quiet --locked --release \
-    --manifest-path crates/rx/Cargo.toml \
-    --target-dir target/reference \
-    --target riscv32im-unknown-none-elf && : > {runtime}
+BUILD = cmake -S . -B target/cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF && \
+    cmake --build target/cmake --target rx_compiler_cli --parallel 2 && \
+    if command -v cargo >/dev/null 2>&1; then \
+        CARGO_PROFILE_RELEASE_LTO=true cargo build --quiet --locked --release \
+            --manifest-path crates/rx/Cargo.toml \
+            --target-dir target/reference \
+            --target riscv32im-unknown-none-elf; \
+    fi && : > {runtime}
 
-# Required for semantic tests: exit 0 to accept {source}, 1 to reject it.
-SEMANTIC = RX_SOURCE={source} $(REFERENCE_RUSTC) --cfg rx_semantic \
-    --emit=metadata crates/rx/src/entry.rs -o {output}
+# The C++ compiler is used for semantic tests.
+# Exit 0 to accept {source}, 1 to reject it.
+SEMANTIC = target/cmake/rx_compiler_cli {source}
 
-# Required for IR tests: write RV32 LLVM IR to {output} (.ll).
+# The following commands retain the template's Rust reference implementation
+# for IR/codegen testing. They require the Rust target and Clang 22.
 IR = RUST_MIN_STACK=16777216 RX_SOURCE={source} $(REFERENCE_RUSTC) --crate-type=staticlib \
     --emit=llvm-ir={output},link={output}.a -C opt-level=2 -C lto=fat \
     crates/rx/src/entry.rs
 
-# Required for codegen/optimization tests: write RV32IM assembly to {output} (.s).
 CODEGEN = RUST_MIN_STACK=16777216 RX_SOURCE={source} $(REFERENCE_RUSTC) --crate-type=staticlib \
     --emit=asm={output},link={output}.a -C opt-level=2 -C lto=fat \
     -C llvm-args=-riscv-no-aliases crates/rx/src/entry.rs && \
     $(PYTHON) scripts/strip_asm_debug.py {output}
 
-# Required alongside IR/CODEGEN: run the assembly with the BUILD runtime in REIMU.
 RUN = xmake run -P vendor/REIMU reimu --memory=256M --stack=1M \
     -f {output},{runtime} -o {stdout} -p {profile} 1>&2
 
-# Rust reference helper; remove once your commands no longer use it.
+# Rust reference helper; remove once all stages use the C++ compiler.
 # v0 symbols avoid quoted section names that REIMU does not recognize.
 REFERENCE_RUSTC = rustc \
     --edition=2021 \

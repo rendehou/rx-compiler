@@ -28,7 +28,7 @@ xmake -y -P vendor/REIMU
 
 Rerun these commands after updating the REIMU submodule.
 
-If you want to run default `rustc` test, install `rustup`, and run
+If you want to run the IR/Codegen tests that still use the Rust reference implementation, install `rustup`, and run
 ```sh
 rustup target add riscv32im-unknown-none-elf
 ```

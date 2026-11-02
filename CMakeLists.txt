@@ -69,6 +69,12 @@ target_link_libraries(rx_compiler
 
 target_compile_features(rx_compiler PUBLIC cxx_std_17)
 
+# Command-line entry point used by config.mk and the Online Judge.
+add_executable(rx_compiler_cli
+    compiler/src/main.cpp
+)
+target_link_libraries(rx_compiler_cli PRIVATE rx::compiler)
+
 if(BUILD_TESTING)
     add_executable(astbuilder_current_test
         compiler/tests/astbuilder_current_test.cpp

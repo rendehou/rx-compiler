@@ -28,7 +28,7 @@ xmake -y -P vendor/REIMU
 
 在更新 REIMU 子模块后需重复执行上述命令。
 
-如果你想要运行默认的 `rustc` 测试，请先安装 `rustup`，然后运行
+如果你要运行仍使用 Rust 参考实现的 IR/Codegen 测试，请先安装 `rustup`，然后运行
 ```sh
 rustup target add riscv32im-unknown-none-elf
 ```
