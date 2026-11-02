@@ -14,18 +14,39 @@ namespace rx::semantic {
     bool Checker::checkProgram(
         const std::shared_ptr<ast::Program>& program
     ) {
-        if(!program) {
+        if (!program) {
             return false;
         }
 
+        // 检查AST节点
         for (const auto& item : program->items) {
-            auto function = std::dynamic_pointer_cast<ast::FunctionItem> (item);
-            if (function) {
-                if(!checkFunction(function,"")) {//先传空字符串，一会处理再放入selftype
+            if (!item) {
+                return false;
+            }
+        }
+
+        // 收集全局函数、常量、结构体
+        if (!collectItems(program)) {
+            return false;
+        }
+
+        // 检查全局声明
+        if (!checkDeclarations(program)) {
+            return false;
+        }
+
+        // 检查函数体
+        for (const auto& item : program->items) {
+
+            if (auto function =
+                std::dynamic_pointer_cast<ast::FunctionItem>(item)) {
+
+                if (!checkFunction(function, "")) {
                     return false;
                 }
             }
         }
+
         return true;
     }
 
@@ -33,16 +54,24 @@ namespace rx::semantic {
         const std::shared_ptr<ast::FunctionItem>& function,
         const std::string& self_type
     ) {
-
         if (!function || !function->body) {
             return false;
         }
-        if (function->receiver && self_type.empty()) {//有receiver但没有self
+
+        // 有receiver时，必须处于某个impl中
+        if (function->receiver && self_type.empty()) {
             return false;
         }
 
-        //获取返回类型，没有就是unit
+        // 检查Self对应的结构体是否存在
+        if (!self_type.empty() &&
+            struct_map.find(self_type) == struct_map.end()) {
+            return false;
+        }
+
+        // 获取函数返回类型，没有就是Unit
         Type return_type = function->return_type ? resolveType(function->return_type, self_type) : Type::makeUnit();
+
         if (return_type.isError()) {
             return false;
         }
@@ -50,22 +79,72 @@ namespace rx::semantic {
         // 创建函数作用域
         Scope function_scope;
 
-        // 处理参数
+        // 处理self接收者
+        if (function->receiver) {
+
+            Type receiver_type = Type::makeStruct(self_type);
+            bool mutable_binding = false;
+
+            switch (function->receiver->kind) {
+                // self
+                case ast::ReceiverKind::Value:
+                    break;
+
+                // mut self
+                case ast::ReceiverKind::MutableValue:
+                    mutable_binding = true;
+                    break;
+
+                // &self
+                case ast::ReceiverKind::SharedReference:
+                    receiver_type = Type::makeReference(
+                        receiver_type,
+                        false
+                    );
+                    break;
+
+                // &mut self
+                case ast::ReceiverKind::MutableReference:
+                    receiver_type = Type::makeReference(
+                        receiver_type,
+                        true
+                    );
+                    break;
+            }
+
+            function_scope.define(
+                "self",
+                LocalSymbol{
+                    receiver_type,
+                    mutable_binding
+                }
+            );
+        }
+
+        // 处理普通参数
         for (const auto& parameter : function->parameters) {
-            if (!parameter || !parameter->type) {
+
+            if (!parameter || !parameter->type ||
+                parameter->name.empty()) {
                 return false;
             }
+
+            // 检查参数是否重名
             if (function_scope.findCurrent(parameter->name)) {
                 return false;
             }
 
             Type parameter_type = resolveType(
-                parameter->type, self_type
+                parameter->type,
+                self_type
             );
+
             if (parameter_type.isError()) {
                 return false;
             }
-            function_scope.define(//在当前作用域定义函数参数
+
+            // 将参数加入函数作用域
+            function_scope.define(
                 parameter->name,
                 LocalSymbol{
                     parameter_type,
@@ -74,6 +153,28 @@ namespace rx::semantic {
             );
         }
 
+        // 创建当前函数的检查上下文
+        CheckContext context;
+
+        context.return_type = return_type;
+        context.self_type = self_type;
+
+        // 检查函数体
+        ExprResult body_result = checkBlock(
+            function->body,
+            function_scope,
+            context,
+            &return_type
+        );
+
+        if (body_result.type.isError()) {
+            return false;
+        }
+
+        // 函数体最终类型必须能赋给声明的返回类型
+        if (!canAssignment(body_result.type, return_type)) {
+            return false;
+        }
         return true;
     }
 
@@ -82,56 +183,98 @@ namespace rx::semantic {
         Scope& parent,
         CheckContext& context,
         const Type* expected_type
-    ){
+    ) {
         if (!block) {
             return {Type::makeError()};
         }
 
-        //创建当前代码块作用域
+        // 创建当前代码块作用域
         Scope scope(&parent);
 
-        // 按顺序检查所有expr
+        // 记录当前Block是否已经发散
+        bool fasan = false;
+
+        // 按顺序检查所有Statement
         for (const auto& statement : block->statements) {
-            if (!checkStatement(statement, scope, context)) {
-                return {Type::makeError()};//表达式或类型检查失败
+
+            ExprResult result = checkStatement(
+                statement,
+                scope,
+                context
+            );
+
+            if (result.type.isError()) {
+                return {Type::makeError()};
+            }
+
+            // 即使已经发散，也继续检查后面的语句
+            if (result.type.isNever()) {
+                fasan = true;
             }
         }
 
-        //如果有，就检查tail expression，否则是空类型
+        // 检查tail expression
         if (block->tail) {
-            return checkExpr(block->tail, scope, context, expected_type);
+
+            ExprResult tail_result = checkExpr(
+                block->tail,
+                scope,
+                context,
+                expected_type
+            );
+
+            if (tail_result.type.isError()) {
+                return {Type::makeError()};
+            }
+
+            // 前面的语句已经发散，或者tail本身发散
+            if (fasan || tail_result.type.isNever()) {
+                return {Type::makeNever()};
+            }
+
+            return tail_result;
         }
+
+        // 没有tail
+        if (fasan) {
+            return {Type::makeNever()};
+        }
+
         return {Type::makeUnit()};
     }
 
-    bool Checker::checkStatement(
+    ExprResult Checker::checkStatement(
         const std::shared_ptr<ast::Statement>& statement,
         Scope& scope,
         CheckContext& context
     ) {
-
         if (!statement) {
-            return false;
-        } 
-        if (std::dynamic_pointer_cast<ast::EmptyStatement>(statement)) {//空语句直接返回
-            return true;
+            return {Type::makeError()};
         }
 
-        // checklet声明语句
+        // 空语句
+        if (std::dynamic_pointer_cast<ast::EmptyStatement>(statement)) {
+            return {Type::makeUnit()};
+        }
+
+        // let声明语句
         if (auto let = std::dynamic_pointer_cast<ast::LetStatement>(statement)) {
             if (let->name.empty()) {
-                return false;
+                return {Type::makeError()};
             }
 
             Type variable_type = Type::makeError();
+            bool initializer_never = false;
 
             // 解析显式声明的类型
             if (let->declared_type) {
                 variable_type = resolveType(
-                    let->declared_type, context.self_type
+                    let->declared_type,
+                    context.self_type
                 );
+
                 if (variable_type.isError()) {
-                    return false;
+                    return {Type::makeError()};
                 }
             }
 
@@ -145,41 +288,77 @@ namespace rx::semantic {
                 );
 
                 if (initializer.type.isError()) {
-                    return false;
+                    return {Type::makeError()};
                 }
-                if (let->declared_type) {//有显示类型，就比较
-                    if (initializer.type != variable_type) {
-                        return false;
+
+                initializer_never = initializer.type.isNever();
+
+                if (let->declared_type) {
+                    // 有显示类型，就比较
+                    if (!canAssignment(initializer.type, variable_type)) {
+                        return {Type::makeError()};
                     }
-                } else {
+                }
+                else {
+                    // 没有显式类型，通过初始化值推断
                     variable_type = initializer.type;
                 }
             }
 
+            // 没有类型，也没有初始化值
             if (variable_type.isError()) {
-                return false;
+                return {Type::makeError()};
             }
 
             // 定义变量
-            scope.define(let->name,
+            scope.define(
+                let->name,
                 LocalSymbol{
                     variable_type,
                     let->mutable_binding
                 }
             );
-            return true;
+
+            // 初始化表达式发散，整个let语句也发散
+            if (initializer_never) {
+                return {Type::makeNever()};
+            }
+
+            return {Type::makeUnit()};
         }
 
         // 表达式语句
         if (auto expression = std::dynamic_pointer_cast<ast::ExpressionStatement>(statement)) {
+
+            if (!expression->expression) {
+                return {Type::makeError()};
+            }
+
             ExprResult result = checkExpr(
-                expression->expression, scope, context
+                expression->expression,
+                scope,
+                context
             );
 
-            return !result.type.isError();
+            if (result.type.isError()) {
+                return {Type::makeError()};
+            }
+
+            // Never表达式无论有没有分号，都会发散
+            if (result.type.isNever()) {
+                return {Type::makeNever()};
+            }
+
+            // 没有分号的非末尾表达式必须是Unit
+            if (!expression->has_semicolon && !result.type.isUnit()) {
+                return {Type::makeError()};
+            }
+
+            // 普通表达式语句不保留表达式的值
+            return {Type::makeUnit()};
         }
 
-        return false;
+        return {Type::makeError()};
     }
 
     ExprResult Checker::checkExpr(
@@ -256,7 +435,8 @@ namespace rx::semantic {
 
         return {Type::makeError()};
     }
-        ExprResult Checker::checkPath(
+
+    ExprResult Checker::checkPath(
         const std::shared_ptr<ast::PathExpr>& expr,
         Scope& scope,
         CheckContext& context
