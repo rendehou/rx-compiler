@@ -5,6 +5,7 @@
 #include "rx/frontend/astbuilder.hpp"
 #include "rx/semantic/checker.hpp"
 
+#include <cstddef>
 #include <exception>
 #include <fstream>
 #include <iostream>
@@ -49,9 +50,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    const std::string source(
-        std::istreambuf_iterator<char>(file),
-        std::istreambuf_iterator<char>()
+    const std::string source = std::string(
+        std::istreambuf_iterator<char>{file},
+        std::istreambuf_iterator<char>{}
     );
 
     try {
