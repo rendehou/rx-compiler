@@ -1,5 +1,3 @@
-#pragma once
-
 #include "rx/semantic/checker.hpp"
 #include "rx/semantic/collector.hpp"
 #include "rx/semantic/constevaluator.hpp"
@@ -588,39 +586,42 @@ namespace rx::semantic {
                 };
             }
         }
+
+        return {Type::makeError()};
     }
 
 
-    //内部判断是否可以比较，这里是辅助函数
-    bool canOrder(const Type& lhs, const Type& rhs) {
-        // 两侧类型完全相同，并且最终是整数或 bool
-        if (lhs == rhs) {
-            const Type* current = &lhs;
-
-            while (current->isReference()) {
-                if (!current->inner) {
-                    return false;
-                }
-                current = current->inner.get();
-            }
-
-            if (current->isInteger() || current->isBool()) {
-                return true;
-            }
+    // 获取整数或 bool 的实际类型，允许一层共享引用 &T。
+    bool Checker::getScalarOperandType(
+        const Type& type,
+        Type& result
+    ) const {
+        if (type.isInteger() || type.isBool()) {
+            result = type;
+            return true;
         }
-        // 特殊情况：左边是 &T，右边是 &mut T
-        if (lhs.isReference() && rhs.isReference() &&
-            !lhs.mutable_reference && rhs.mutable_reference &&
-            lhs.inner && rhs.inner &&
-            *lhs.inner == *rhs.inner) {
+
+        if (type.isReference() &&
+            !type.mutable_reference &&
+            type.inner &&
+            (type.inner->isInteger() || type.inner->isBool())) {
+            result = *type.inner;
             return true;
         }
 
         return false;
     }
 
-    // 判断类型本身或经过多层引用后，最终是否为整数或 bool
-    bool isOrderedType(const Type& type) {
+    // 获取整数的实际类型，允许一层共享引用 &T。
+    bool Checker::getIntegerOperandType(
+        const Type& type,
+        Type& result
+    ) const {
+        return getScalarOperandType(type, result) && result.isInteger();
+    }
+
+    // 判断类型本身或经过多层引用后，最终是否为整数或 bool。
+    bool Checker::isOrderedType(const Type& type) const {
         const Type* current = &type;
 
         while (current->isReference()) {
@@ -634,13 +635,16 @@ namespace rx::semantic {
         return current->isInteger() || current->isBool();
     }
 
-    // 判断左右两种类型能否进行大小比较
-    bool canCompareOrder(const Type& left, const Type& right) {
+    // 判断左右两种类型能否进行大小比较。
+    bool Checker::canCompareOrder(
+        const Type& left,
+        const Type& right
+    ) const {
         if (left == right && isOrderedType(left)) {
             return true;
         }
 
-        // 特殊情况：左侧是 &T，右侧是 &mut，需要判断内层
+        // 特殊情况：左侧是 &T，右侧是 &mut T，需要判断内层。
         if (left.isReference() && right.isReference() &&
             !left.mutable_reference && right.mutable_reference &&
             left.inner && right.inner &&
@@ -652,8 +656,8 @@ namespace rx::semantic {
         return false;
     }
 
-    // 判断类型是否支持 PartialEq
-    bool hasPartialEq(const Type& type) {
+    // 判断类型是否支持 PartialEq。
+    bool Checker::hasPartialEq(const Type& type) const {
         if (type.isInteger() || type.isBool()) {
             return true;
         }
