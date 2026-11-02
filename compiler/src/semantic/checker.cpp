@@ -1159,7 +1159,7 @@ namespace rx::semantic {
         Type element_type = Type::makeError();
 
         bool has_element = false;
-        bool fasan = false;
+        bool fasan = false;//判断是不是never类型
 
         std::vector<Type> previous_types;
 
@@ -1192,14 +1192,8 @@ namespace rx::semantic {
                 has_element = true;
             }
             else {
-
-                // 当前元素可以赋给已有类型
-                if (canAssignment(result.type, element_type)) {
-                    // 保持原来的类型
-                }
-
-                // 尝试使用当前元素的类型作为新的共同类型
-                else if (canAssignment(element_type, result.type)) {
+                // 如果不能赋值，就尝试使用当前元素的类型作为新的共同类型
+                if (!canAssignment(result.type, element_type) && canAssignment(element_type, result.type)) {
 
                     // 之前所有元素也必须能够转换为新类型
                     for (const auto& previous : previous_types) {
@@ -1250,6 +1244,7 @@ namespace rx::semantic {
 
         Type usize_type = Type::makeUSize();
 
+        // 数组长度必须是编译期常量
         if (!evaluator.evaluateValue(expr->count, usize_type, count_value)) {
             return {Type::makeError()};
         }
@@ -1284,6 +1279,7 @@ namespace rx::semantic {
         };
     }
 
+    // 检查总体类型与path，和定义，检查每个字段
     ExprResult Checker::checkStructInit(
         const std::shared_ptr<ast::StructInitExpr>& expr,
         Scope& scope,
@@ -1300,7 +1296,7 @@ namespace rx::semantic {
             }
         }
 
-        // 当前只支持单段结构体路径
+        // 当前只支持单段结构体路径，多段我还没想好
         if (expr->path->segments.size() != 1) {
             return {Type::makeError()};
         }
@@ -1329,7 +1325,6 @@ namespace rx::semantic {
 
         // 检查每一个初始化字段
         for (const auto& initializer : expr->fields) {
-
             if (!initializer || initializer->name.empty() || !initializer->value) {
                 return {Type::makeError()};
             }
@@ -1343,7 +1338,6 @@ namespace rx::semantic {
 
             // 找字段定义
             std::shared_ptr<ast::StructField> field_definition;
-
             for (const auto& field : structure->second->fields) {
 
                 if (!field || !field->type) {
@@ -1366,7 +1360,6 @@ namespace rx::semantic {
                 field_definition->type,
                 struct_name
             );
-
             if (field_type.isError()) {
                 return {Type::makeError()};
             }
@@ -1387,7 +1380,6 @@ namespace rx::semantic {
             if (!canAssignment(value.type, field_type)) {
                 return {Type::makeError()};
             }
-
             if (value.type.isNever()) {
                 has_never = true;
             }
@@ -1403,7 +1395,6 @@ namespace rx::semantic {
             }
 
             bool initialized = false;
-
             for (const auto& name : initialized_fields) {
                 if (name == field->name) {
                     initialized = true;
@@ -1420,7 +1411,6 @@ namespace rx::semantic {
         if (has_never) {
             return {Type::makeNever()};
         }
-
         return {Type::makeStruct(struct_name), false, false};
     }
 
@@ -1469,8 +1459,7 @@ namespace rx::semantic {
             }
 
             // then必须是Unit或者Never
-            if (!then_result.type.isNever() &&
-                !then_result.type.isUnit()) {
+            if (!then_result.type.isNever() && !then_result.type.isUnit()) {
                 return {Type::makeError()};
             }
 
@@ -1514,11 +1503,10 @@ namespace rx::semantic {
             return {Type::makeNever()};
         }
 
-        // 有预期类型
+        // 有预期返回值的if，比如外层是赋值 let x = if xxx {1}
         if (expected_type) {
 
-            if (!canAssignment(then_result.type, *expected_type) ||
-                !canAssignment(else_result.type, *expected_type)) {
+            if (!canAssignment(then_result.type, *expected_type) || !canAssignment(else_result.type, *expected_type)) {
                 return {Type::makeError()};
             }
 
@@ -1556,7 +1544,7 @@ namespace rx::semantic {
             result_type = else_result.type;
         }
 
-        else {
+        else {//报错
             return {Type::makeError()};
         }
 
@@ -1567,6 +1555,7 @@ namespace rx::semantic {
         return {result_type, false, false};
     }
 
+    // while 和 loop,loop的返回类型由break决定，while没有
     ExprResult Checker::checkWhile(
         const std::shared_ptr<ast::WhileExpr>& expr,
         Scope& scope,
@@ -1576,7 +1565,7 @@ namespace rx::semantic {
             return {Type::makeError()};
         }
 
-        // 检查condition
+        // 检查condition bool或never
         Type bool_type = Type::makeBool();
 
         ExprResult condition = checkExpr(
@@ -1627,5 +1616,183 @@ namespace rx::semantic {
         }
 
         return {Type::makeUnit(), false, false};
+    }
+    ExprResult Checker::checkLoop(
+        const std::shared_ptr<ast::LoopExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr || !expr->body) {
+            return {Type::makeError()};
+        }
+
+        // 进入loop循环
+        LoopContext loop;
+        loop.allow_value_break = true;
+
+        context.loops.push_back(loop);
+
+        // loop的body本身必须是Unit或者Never
+        Type unit_type = Type::makeUnit();
+
+        ExprResult body = checkBlock(
+            expr->body,
+            scope,
+            context,
+            &unit_type
+        );
+
+        // 先保存break类型，再退出当前loop
+        std::vector<Type> break_types = context.loops.back().break_types;
+
+        context.loops.pop_back();
+
+        if (body.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        if (!body.type.isNever() && !body.type.isUnit()) {
+            return {Type::makeError()};
+        }
+
+        // 没有任何正常break，loop永远不会正常结束
+        if (break_types.empty()) {
+            return {Type::makeNever()};
+        }
+
+        Type result_type = break_types[0];
+
+        // 合并所有break的类型
+        for (std::size_t i = 1; i < break_types.size(); ++i) {
+
+            const Type& current = break_types[i];
+
+            // 当前类型可以赋给已有类型
+            if (canAssignment(current, result_type)) {
+                continue;
+            }
+
+            // 已有类型可以赋给当前类型，则使用当前类型
+            if (canAssignment(result_type, current)) {
+                result_type = current;
+                continue;
+            }
+
+            return {Type::makeError()};
+        }
+
+        return {result_type, false, false};
+    }
+
+    ExprResult Checker::checkReturn(
+        const std::shared_ptr<ast::ReturnExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr) {
+            return {Type::makeError()};
+        }
+
+        if (!expr->value) {
+
+            // 只有返回Unit的函数可以直接return
+            if (!context.return_type.isUnit()) {
+                return {Type::makeError()};
+            }
+
+            return {Type::makeNever()};
+        }
+
+        // return value;
+        ExprResult value = checkExpr(
+            expr->value,
+            scope,
+            context,
+            &context.return_type
+        );
+
+        if (value.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        // 返回值必须能够赋给函数声明的返回类型
+        if (!canAssignment(value.type, context.return_type)) {
+            return {Type::makeError()};
+        }
+
+        // return之后不会继续执行
+        return {Type::makeNever()};
+    }
+
+    ExprResult Checker::checkBreak(
+        const std::shared_ptr<ast::BreakExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr) {
+            return {Type::makeError()};
+        }
+
+        // 不在循环内部不能break
+        if (context.loops.empty()) {
+            return {Type::makeError()};
+        }
+
+        LoopContext& loop = context.loops.back();
+
+        if (expr->value) {
+
+            // while不允许break value
+            if (!loop.allow_value_break) {
+                return {Type::makeError()};
+            }
+
+            ExprResult value = checkExpr(
+                expr->value,
+                scope,
+                context,
+                loop.expected_type
+            );
+
+            if (value.type.isError()) {
+                return {Type::makeError()};
+            }
+
+            // break后面的value本身发散
+            // 实际上break不会真正发生，所以不记录break类型
+            if (value.type.isNever()) {
+                return {Type::makeNever()};
+            }
+
+            loop.break_types.push_back(value.type);
+
+            return {Type::makeNever()};
+        }
+
+        // 单个的break对loop来说相当于break ()
+        if (loop.allow_value_break) {
+            loop.break_types.push_back(Type::makeUnit());
+        }
+
+        // while里的break不需要记录类型，因为while固定为Unit
+        return {Type::makeNever()};
+    }
+    
+    ExprResult Checker::checkContinue(
+        const std::shared_ptr<ast::ContinueExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr) {
+            return {Type::makeError()};
+        }
+
+        // 不在循环内部不能continue
+        if (context.loops.empty()) {
+            return {Type::makeError()};
+        }
+
+        // continue之后当前路径用never占位
+        return {Type::makeNever()};
     }
 } // namespace rx::semantic

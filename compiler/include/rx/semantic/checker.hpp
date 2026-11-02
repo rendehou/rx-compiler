@@ -17,22 +17,25 @@ namespace rx::semantic {
         Type type;
 
         bool is_assignable = false;//能否作左值
-        bool is_mutable = false;//能否mut，只有写mut才能赋值，因为引用可以有很多副本，但赋值相当于操作变量所有权，只有一个
+        bool is_mutable = false;//能否mut，只有写有mut才能赋值，因为引用可以有很多副本，但赋值相当于操作变量所有权，只有一个
         bool mutable_access_blocked = false;// 判断是否因为只读而失去赋值能力
     };
 
-    struct CheckContext {
-        // 当前函数返回类型
+    struct CheckContext {// 当前函数返回类型
+        
         Type return_type = Type::makeUnit();
 
         std::string self_type;
-        std::vector<LoopContext> loops;
+        std::vector<LoopContext> loops;// 判断当前进入了哪些循环的记录栈，用来给break，return等判断当前循环
     };
+
+    //记录循环信息的量
     struct LoopContext {
-        bool allow_value_break = false;
-        const Type* expected_type = nullptr;
-        
+        bool allow_value_break = false;//是否允许break带有值
+        const Type* expected_type = nullptr;// return使用，预期返回值
+        std::vector<Type> break_types;
     };
+
     class Checker {
     public:
         // 整个函数体检查阶段的入口
