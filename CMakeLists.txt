@@ -7,19 +7,34 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(CTest)
-include(FetchContent)
 
-# Match the ANTLR version used to generate the checked-in C++ parser sources.
+# Use the exact ANTLR version that generated the checked-in C++ parser.
+# Prefer the pinned submodule so the build does not require network access.
+set(ANTLR_CPP_RUNTIME_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/vendor/antlr4/runtime/Cpp"
+)
+
 set(ANTLR_BUILD_CPP_TESTS OFF CACHE BOOL "" FORCE)
 set(ANTLR_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 set(ANTLR_BUILD_STATIC ON CACHE BOOL "" FORCE)
+set(ANTLR4_INSTALL OFF CACHE BOOL "" FORCE)
 
-FetchContent_Declare(
-    antlr4_cpp_source
-    URL https://github.com/antlr/antlr4/archive/refs/tags/4.13.2.zip
-    SOURCE_SUBDIR runtime/Cpp
-)
-FetchContent_MakeAvailable(antlr4_cpp_source)
+if(EXISTS "${ANTLR_CPP_RUNTIME_DIR}/CMakeLists.txt")
+    add_subdirectory(
+        "${ANTLR_CPP_RUNTIME_DIR}"
+        "${CMAKE_CURRENT_BINARY_DIR}/antlr4-runtime"
+    )
+else()
+    # Allow a preinstalled, exactly matching runtime as a fallback when
+    # the source submodule is not available in the build environment.
+    find_package(antlr4-runtime 4.13.2 EXACT CONFIG QUIET)
+    if(NOT TARGET antlr4_static)
+        message(FATAL_ERROR
+            "ANTLR 4.13.2 C++ Runtime was not found. Initialize the pinned "
+            "submodule with: git submodule update --init vendor/antlr4"
+        )
+    endif()
+endif()
 
 set(RX_ANTLR_GENERATED_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/compiler/build/generated"

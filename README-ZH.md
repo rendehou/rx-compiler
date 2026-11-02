@@ -47,9 +47,9 @@ IR 测试还需要 **Clang 22**。
 
 - CMake 3.18 或更高版本。
 - 支持 C++17 的编译器。
-- 首次配置时需要网络连接，以便 CMake FetchContent 下载 ANTLR 4.13.2 C++ Runtime。
+- ANTLR 4.13.2 C++ Runtime 通过固定版本的 Git Submodule 存放在 `vendor/antlr4/`。首次克隆后，请先执行 `git submodule update --init --recursive`。
 
-ANTLR 生成的 C++ 文件已经提交在 `compiler/build/generated/` 中，因此不需要安装 Java 或 ANTLR JAR。
+ANTLR 生成的 C++ 文件已经提交在 `compiler/build/generated/` 中，因此不需要安装 Java 或 ANTLR JAR。Runtime 源码已随子模块提供，CMake 配置和编译阶段不需要访问网络。
 
 在仓库根目录执行：
 

@@ -7,3 +7,6 @@
 [submodule "vendor/REIMU"]
 	path = vendor/REIMU
 	url = https://github.com/wanoful/REIMU.git
+[submodule "vendor/antlr4"]
+	path = vendor/antlr4
+	url = https://github.com/antlr/antlr4.git

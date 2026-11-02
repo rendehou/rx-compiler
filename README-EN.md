@@ -47,9 +47,9 @@ Requirements:
 
 - CMake 3.18 or newer.
 - A C++17-compatible compiler.
-- Network access during the first configure step so CMake FetchContent can download the ANTLR 4.13.2 C++ runtime.
+- The ANTLR 4.13.2 C++ runtime is pinned as a Git submodule at `vendor/antlr4/`. After cloning, initialize submodules with `git submodule update --init --recursive`.
 
-The generated ANTLR C++ files are checked into `compiler/build/generated/`, so Java and the ANTLR JAR are not required.
+The generated ANTLR C++ files are checked into `compiler/build/generated/`, so Java and the ANTLR JAR are not required. The runtime source is provided by the submodule, so CMake configuration and compilation do not need network access.
 
 Run the following commands from the repository root:
 
