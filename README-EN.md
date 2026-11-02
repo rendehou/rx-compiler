@@ -35,6 +35,37 @@ rustup target add riscv32im-unknown-none-elf
 
 IR tests also require **Clang 22**.
 
+
+## Building the C++ Components with CMake
+
+The repository root provides a unified CMake entry point. It compiles the AST, ANTLR AST builder, semantic analysis implementation, and checked-in ANTLR C++ sources into the `rx_compiler` static library. It also builds the AST builder and semantic analysis unit tests.
+
+Requirements:
+
+- CMake 3.18 or newer.
+- A C++17-compatible compiler.
+- Network access during the first configure step so CMake FetchContent can download the ANTLR 4.13.2 C++ runtime.
+
+The generated ANTLR C++ files are checked into `compiler/build/generated/`, so Java and the ANTLR JAR are not required for this build.
+
+Run the following commands from the repository root:
+
+```sh
+cmake -S . -B target/cmake -DCMAKE_BUILD_TYPE=Release
+cmake --build target/cmake --parallel
+ctest --test-dir target/cmake --output-on-failure
+```
+
+To build only the static library without the unit tests:
+
+```sh
+cmake -S . -B target/cmake -DBUILD_TESTING=OFF
+cmake --build target/cmake --target rx_compiler --parallel
+```
+
+The `rx_compiler` CMake target is a static library, not a standalone command-line executable: the repository does not yet provide a compiler driver entry point. This build is independent of the course testcase runner provided by the Makefile (`make test`). REIMU must still be built separately as described above.
+
+
 ## Overview
 
 In this course you can use **any language** to implement your compiler. Contact the TA if your language is not mainstream so that we can provide support for it on the Online Judge. For this reason, the template we provide here is **language-agnostic**. You will find:

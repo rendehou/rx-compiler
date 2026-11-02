@@ -35,6 +35,37 @@ rustup target add riscv32im-unknown-none-elf
 
 IR 测试还需要 **Clang 22**。
 
+
+## 使用 CMake 构建 C++ 组件
+
+仓库根目录提供统一的 CMake 构建入口。它会将 AST、ANTLR AST Builder、语义分析代码以及已生成的 ANTLR C++ 源码编译为静态库 `rx_compiler`，并构建 AST Builder 和语义分析单元测试。
+
+环境要求：
+
+- CMake 3.18 或更高版本。
+- 支持 C++17 的编译器。
+- 首次配置时需要网络连接，以便通过 CMake FetchContent 下载 ANTLR 4.13.2 C++ Runtime。
+
+ANTLR 生成的 C++ 文件已经提交在 `compiler/build/generated/` 中，因此构建时不需要安装 Java 或 ANTLR JAR。
+
+在仓库根目录执行：
+
+```sh
+cmake -S . -B target/cmake -DCMAKE_BUILD_TYPE=Release
+cmake --build target/cmake --parallel
+ctest --test-dir target/cmake --output-on-failure
+```
+
+如果只需要构建静态库，不需要构建单元测试：
+
+```sh
+cmake -S . -B target/cmake -DBUILD_TESTING=OFF
+cmake --build target/cmake --target rx_compiler --parallel
+```
+
+当前 CMake 目标 `rx_compiler` 是静态库，不会生成独立的命令行编译器；仓库尚未提供编译器驱动程序入口。此构建与 Makefile 提供的课程测试运行器（`make test`）相互独立，REIMU 仍需按照前文说明单独构建。
+
+
 ## 概述
 
 在本门课程中，你可以使用**任意语言**来实现你的编译器。如果你的实现语言较为冷门，请联系助教以便我们在 Online Judge（评测机）上提供支持。因此，我们在此提供的模板是**与实现语言无关的（language-agnostic）**。仓库中包含：
