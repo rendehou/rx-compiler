@@ -36,9 +36,12 @@ rustup target add riscv32im-unknown-none-elf
 IR tests also require **Clang 22**.
 
 
-## Building the C++ Components with CMake
+## Building the C++ Compiler with CMake
 
-The repository root provides a unified CMake entry point. It compiles the AST, ANTLR AST builder, semantic analysis implementation, and checked-in ANTLR C++ sources into the `rx_compiler` static library. It also builds the AST builder and semantic analysis unit tests.
+The repository root provides a unified CMake build with two main targets:
+
+- `rx_compiler`: a static library containing the AST, ANTLR AST builder, and semantic analysis implementation.
+- `rx_compiler_cli`: a command-line compiler entry point that reads an Rx source file, parses it, builds the AST, and runs semantic checks.
 
 Requirements:
 
@@ -46,7 +49,7 @@ Requirements:
 - A C++17-compatible compiler.
 - Network access during the first configure step so CMake FetchContent can download the ANTLR 4.13.2 C++ runtime.
 
-The generated ANTLR C++ files are checked into `compiler/build/generated/`, so Java and the ANTLR JAR are not required for this build.
+The generated ANTLR C++ files are checked into `compiler/build/generated/`, so Java and the ANTLR JAR are not required.
 
 Run the following commands from the repository root:
 
@@ -56,14 +59,26 @@ cmake --build target/cmake --parallel
 ctest --test-dir target/cmake --output-on-failure
 ```
 
-To build only the static library without the unit tests:
+To check a source file directly:
+
+```sh
+./target/cmake/rx_compiler_cli path/to/source.rx
+```
+
+The CLI exits with code `0` when parsing and semantic analysis succeed, and `1` when either fails. The Online Judge's `config.mk` is wired to this executable for Semantic tests:
+
+```sh
+make test STAGE=semantic
+```
+
+To build only the CLI without the unit tests:
 
 ```sh
 cmake -S . -B target/cmake -DBUILD_TESTING=OFF
-cmake --build target/cmake --target rx_compiler --parallel
+cmake --build target/cmake --target rx_compiler_cli --parallel
 ```
 
-The `rx_compiler` CMake target is a static library, not a standalone command-line executable: the repository does not yet provide a compiler driver entry point. This build is independent of the course testcase runner provided by the Makefile (`make test`). REIMU must still be built separately as described above.
+The IR and Codegen commands still use the template's Rust reference implementation and therefore require the corresponding Rust target; IR tests also require Clang 22. Semantic tests use the C++ compiler and do not require Cargo. REIMU must still be built separately as described above.
 
 
 ## Overview
@@ -71,7 +86,7 @@ The `rx_compiler` CMake target is a static library, not a standalone command-lin
 In this course you can use **any language** to implement your compiler. Contact the TA if your language is not mainstream so that we can provide support for it on the Online Judge. For this reason, the template we provide here is **language-agnostic**. You will find:
 
 - Testcases under `tests/`. Official testcases reside under `tests/official` and is a git submodule. You may add your own testcases under `tests/custom`.
-- A test runner. The `Makefile` runs testcases using the compiler configured in `config.mk`. By default it uses your system rustc with the `riscv32im-unknown-none-elf` target and executes generated assembly in REIMU. **Replace the compiler commands in `config.mk` with your own compiler commands** to set up testing for your compiler. See [Running tests](#running-tests) for details.
+- A test runner. The `Makefile` runs testcases using the compiler configured in `config.mk`. The `SEMANTIC` command is currently connected to this repository's C++ command-line compiler; `IR` and `CODEGEN` still use the template's Rust reference commands. You can continue to adjust `config.mk` as the remaining compiler stages are implemented. See [Running tests](#running-tests) for details.
     - Some auxiliary files (such as the reference compiler helper code in `crates/rx`) help the default rustc produce assembly suitable for REIMU. Its `src/entry.rs` is compiled separately for each testcase and supplies the bare-metal entry point and `Box`/`Vec` imports. The library implements integer I/O through REIMU's libc, plus allocation and panic handling for bare-metal RV32 targets in `src/runtime.rs`. The reference IR and codegen commands request LLVM IR or assembly together with a static library so rustc performs whole-program LTO and includes the runtime in the generated program. The extra `{output}.a` is a build artifact. Codegen strips debug metadata with `scripts/strip_asm_debug.py`; the IR runner lowers `.ll` with Clang and strips the same unsupported metadata. In both paths, `RUN` receives assembly as `{output}`. These helpers can be removed when you replace the Rust compiler commands.
 - REIMU under `vendor/REIMU`, pinned as a git submodule. The `RUN` command in `config.mk` invokes it; the test runner does not depend on a particular simulator.
 - G4 grammar for Rx under `grammar/`. You may use it to generate the lexer and parser for your compiler.

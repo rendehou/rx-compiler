@@ -36,17 +36,20 @@ rustup target add riscv32im-unknown-none-elf
 IR 测试还需要 **Clang 22**。
 
 
-## 使用 CMake 构建 C++ 组件
+## 使用 CMake 构建 C++ 编译器
 
-仓库根目录提供统一的 CMake 构建入口。它会将 AST、ANTLR AST Builder、语义分析代码以及已生成的 ANTLR C++ 源码编译为静态库 `rx_compiler`，并构建 AST Builder 和语义分析单元测试。
+仓库根目录提供统一的 CMake 构建入口，包含：
+
+- `rx_compiler`：AST、ANTLR AST Builder 和语义分析代码组成的静态库。
+- `rx_compiler_cli`：命令行编译器入口，读取 Rx 源文件，完成词法/语法分析、AST 构建和语义检查。
 
 环境要求：
 
 - CMake 3.18 或更高版本。
 - 支持 C++17 的编译器。
-- 首次配置时需要网络连接，以便通过 CMake FetchContent 下载 ANTLR 4.13.2 C++ Runtime。
+- 首次配置时需要网络连接，以便 CMake FetchContent 下载 ANTLR 4.13.2 C++ Runtime。
 
-ANTLR 生成的 C++ 文件已经提交在 `compiler/build/generated/` 中，因此构建时不需要安装 Java 或 ANTLR JAR。
+ANTLR 生成的 C++ 文件已经提交在 `compiler/build/generated/` 中，因此不需要安装 Java 或 ANTLR JAR。
 
 在仓库根目录执行：
 
@@ -56,14 +59,26 @@ cmake --build target/cmake --parallel
 ctest --test-dir target/cmake --output-on-failure
 ```
 
-如果只需要构建静态库，不需要构建单元测试：
+直接检查一个源文件：
+
+```sh
+./target/cmake/rx_compiler_cli path/to/source.rx
+```
+
+语义检查通过时程序退出码为 `0`，语法或语义检查不通过时退出码为 `1`。OJ 的 `config.mk` 已将 Semantic 测试接入该入口，可以直接运行：
+
+```sh
+make test STAGE=semantic
+```
+
+如果只需要构建命令行编译器，不需要构建单元测试：
 
 ```sh
 cmake -S . -B target/cmake -DBUILD_TESTING=OFF
-cmake --build target/cmake --target rx_compiler --parallel
+cmake --build target/cmake --target rx_compiler_cli --parallel
 ```
 
-当前 CMake 目标 `rx_compiler` 是静态库，不会生成独立的命令行编译器；仓库尚未提供编译器驱动程序入口。此构建与 Makefile 提供的课程测试运行器（`make test`）相互独立，REIMU 仍需按照前文说明单独构建。
+当前 IR 和 Codegen 测试命令仍保留模板中的 Rust 参考实现，因此这两个阶段仍需要安装对应的 Rust target；IR 测试还需要 Clang 22。Semantic 测试使用 C++ 编译器，不依赖 Cargo。REIMU 仍需按照前文说明单独构建。
 
 
 ## 概述
@@ -71,7 +86,7 @@ cmake --build target/cmake --target rx_compiler --parallel
 在本门课程中，你可以使用**任意语言**来实现你的编译器。如果你的实现语言较为冷门，请联系助教以便我们在 Online Judge（评测机）上提供支持。因此，我们在此提供的模板是**与实现语言无关的（language-agnostic）**。仓库中包含：
 
 - `tests/` 目录下的测试用例。官方测试用例位于 `tests/official`（作为 Git 子模块引入）。你可以在 `tests/custom` 下添加自己的测试用例。
-- 测试运行器（Test runner）。`Makefile` 会调用在 `config.mk` 中配置的编译器来运行测试用例。默认情况下，它使用系统安装的 rustc（目标架构为 `riscv32im-unknown-none-elf`），并在 REIMU 中执行生成的汇编代码。**请将 `config.mk` 中的编译器命令替换为你自己的编译器命令**，以此为你的编译器配置测试。详见[运行测试](#运行测试)。
+- 测试运行器（Test runner）。`Makefile` 会调用在 `config.mk` 中配置的编译器来运行测试用例。当前 `SEMANTIC` 已接入本仓库的 C++ 命令行编译器；`IR` 和 `CODEGEN` 暂时保留模板中的 Rust 参考命令。你可以继续按自己的实现情况修改 `config.mk`。详见[运行测试](#运行测试)。
     - 一些辅助文件（如 `crates/rx` 中的参考编译器辅助代码）用于帮助默认的 rustc 输出适合 REIMU 的汇编文件。其中 `src/entry.rs` 针对每个测试用例单独编译，提供裸机程序入口点以及 `Box`/`Vec` 导入；库通过 REIMU 的 libc 实现了整数 I/O，并在 `src/runtime.rs` 中为裸机 RV32 目标提供内存分配与 panic 处理。默认的 IR 和 codegen 命令分别请求生成 LLVM IR 或汇编，同时生成静态库，以便 rustc 进行全程序 LTO（链接时优化）并将运行时包含在生成的程序中。额外的 `{output}.a` 属于构建产物。Codegen 通过 `scripts/strip_asm_debug.py` 去除 REIMU 无法汇编的调试元数据；IR 运行器先用 Clang 编译 `.ll`，再移除同类元数据。两种路径中的 `RUN` 都接收汇编形式的 `{output}`。当你将编译器命令替换为你自己的编译器时，这些辅助文件均可移除。
 - `vendor/REIMU` 下的 REIMU，为 Git 子模块。`config.mk` 中的 `RUN` 命令会调用它；测试运行器本身并不依赖特定的模拟器。
 - `grammar/` 目录下的 Rx 语言 G4 文法。你可以使用它来为编译器生成词法分析器和语法分析器。
