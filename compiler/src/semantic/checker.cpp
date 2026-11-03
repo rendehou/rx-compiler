@@ -33,11 +33,22 @@ namespace rx::semantic {
             return false;
         }
 
+        // 检查struct的derive是否合法
+        for (const auto& item : program->items) {
+
+            if (auto structure =
+                std::dynamic_pointer_cast<ast::StructItem>(item)) {
+
+                if (!checkStructDerives(structure)) {
+                    return false;
+                }
+            }
+        }
+
         // 检查函数体
         for (const auto& item : program->items) {
 
-            if (auto function =
-                std::dynamic_pointer_cast<ast::FunctionItem>(item)) {
+            if (auto function = std::dynamic_pointer_cast<ast::FunctionItem>(item)) {
 
                 if (!checkFunction(function, "")) {
                     return false;
@@ -2145,5 +2156,60 @@ namespace rx::semantic {
 
         // continue之后当前路径用never占位
         return {Type::makeNever()};
+    }
+    ExprResult Checker::checkPath(
+        const std::shared_ptr<ast::PathExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr || !expr->path || expr->path->segments.empty()) {
+            return {Type::makeError()};
+        }
+
+        // 检验每一个路径非空
+        for (const auto& segment : expr->path->segments) {
+            if (!segment) {
+                return {Type::makeError()};
+            }
+        }
+
+        // 只有一段path
+        if (expr->path->segments.size() == 1) {
+            const std::string& name =
+                expr->path->segments[0]->name;
+
+            // 在当前scope将name当作变量查找
+            if (auto symbol = scope.find(name)) {
+                return {
+                    symbol->type,
+                    true,
+                    symbol->mutable_binding
+                };
+            }
+
+            // 在全局常量里继续找name的定义
+            auto global = value_map.find(name);
+
+            if (global != value_map.end() &&
+                global->second.kind == ValueSymbolKind::Constant &&
+                global->second.constant) {
+
+                Type type = resolveType(
+                    global->second.constant->type,
+                    context.self_type
+                );
+
+                if (type.isError()) {
+                    return {Type::makeError()};
+                }
+
+                return {type, false, false};
+            }
+
+            return {Type::makeError()};
+        }
+
+        // 多段path以后继续处理
+        return {Type::makeError()};
     }
 } // namespace rx::semantic
