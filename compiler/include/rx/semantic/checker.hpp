@@ -136,6 +136,29 @@ namespace rx::semantic {
         ) const;
         
         // 函数调用
+
+        // 检查函数的普通参数
+        bool checkArguments(
+            const std::vector<std::shared_ptr<ast::Expr>>& arguments,
+            const std::vector<std::shared_ptr<ast::FunctionParameter>>& parameters,
+            std::size_t start,//从哪个位置开始检查
+            const std::string& self_type,
+            Scope& scope,
+            CheckContext& context,//函数调用上下文
+            bool& fasan
+        );
+
+        // 检查已经确定的函数调用
+        ExprResult checkFunctionCall(
+            const std::shared_ptr<ast::FunctionItem>& function,
+            const std::vector<std::shared_ptr<ast::Expr>>& arguments,
+            std::size_t start,
+            const std::string& self_type,
+            Scope& scope,
+            CheckContext& context,
+            bool fasan = false
+        );
+
         ExprResult checkCall(
             const std::shared_ptr<ast::CallExpr>& expr,
             Scope& scope,

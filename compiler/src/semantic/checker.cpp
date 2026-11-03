@@ -2157,6 +2157,7 @@ namespace rx::semantic {
         // continue之后当前路径用never占位
         return {Type::makeNever()};
     }
+
     ExprResult Checker::checkPath(
         const std::shared_ptr<ast::PathExpr>& expr,
         Scope& scope,
@@ -2210,6 +2211,369 @@ namespace rx::semantic {
         }
 
         // 多段path以后继续处理
+        return {Type::makeError()};
+    }
+
+    // 检查函数的普通参数
+    bool Checker::checkArguments(
+        const std::vector<std::shared_ptr<ast::Expr>>& arguments,
+        const std::vector<std::shared_ptr<ast::FunctionParameter>>& parameters,
+        std::size_t start,
+        const std::string& self_type,
+        Scope& scope,
+        CheckContext& context,
+        bool& fasan
+    ) {
+        // 检查参数数量
+        if (arguments.size() != parameters.size() + start) {
+            return false;
+        }
+
+        // 逐个检查实参和形参
+        for (std::size_t i = 0; i < parameters.size(); ++i) {
+
+            const auto& parameter = parameters[i];
+
+            if (!parameter || !parameter->type || !arguments[start + i]) {
+                return false;
+            }
+
+            // 获取形参类型
+            Type type = resolveType(
+                parameter->type,
+                self_type
+            );
+
+            if (type.isError()) {
+                return false;
+            }
+
+            // 检查实参
+            ExprResult argument = checkExpr(
+                arguments[start + i],
+                scope,
+                context,
+                &type
+            );
+
+            if (argument.type.isError()) {
+                return false;
+            }
+
+            // 实参与形参类型相符
+            if (!canAssignment(argument.type, type)) {
+                return false;
+            }
+
+            if (argument.type.isNever()) {
+                fasan = true;
+            }
+        }
+
+        return true;
+    }
+
+    // 检查已经确定的函数调用
+    ExprResult Checker::checkFunctionCall(
+        const std::shared_ptr<ast::FunctionItem>& function,
+        const std::vector<std::shared_ptr<ast::Expr>>& arguments,
+        std::size_t start,
+        const std::string& self_type,
+        Scope& scope,
+        CheckContext& context,
+        bool fasan
+    ) {
+        if (!function) {
+            return {Type::makeError()};
+        }
+
+        // 检查参数
+        if (!checkArguments(
+                arguments,
+                function->parameters,
+                start,
+                self_type,
+                scope,
+                context,
+                fasan)) {
+            return {Type::makeError()};
+        }
+
+        // 参数中有Never，整个调用也不会返回
+        if (fasan) {
+            return {Type::makeNever()};
+        }
+
+        // 获取函数返回类型
+        Type type = function->return_type ? resolveType(function->return_type, self_type) : Type::makeUnit();
+
+        if (type.isError()) {
+            return {Type::makeError()};
+        }
+
+        return {type, false, false};
+    }
+
+    // 包括普通函数，关联函数和builtin函数
+    ExprResult Checker::checkCall(
+        const std::shared_ptr<ast::CallExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr || !expr->callee) {
+            return {Type::makeError()};
+        }
+
+        // 获取函数调用的路径
+        auto path = std::dynamic_pointer_cast<ast::PathExpr>(
+            expr->callee
+        );
+
+        if (!path || !path->path || path->path->segments.empty()) {
+            return {Type::makeError()};
+        }
+
+        //存储路径的vector
+        const auto& parts = path->path->segments;
+
+        // 普通函数调用，例如 f()
+        if (parts.size() == 1) {
+
+            if (!parts[0] || parts[0]->name.empty()) {
+                return {Type::makeError()};
+            }
+
+            std::string name = parts[0]->name;
+
+            // 局部变量会覆盖同名函数
+            if (scope.find(name)) {
+                return {Type::makeError()};
+            }
+
+            // get_i32()
+            if (name == "get_i32") {
+
+                if (!expr->arguments.empty()) {
+                    return {Type::makeError()};
+                }
+
+                return {Type::makeI32(), false, false};
+            }
+
+            // print_i32()和println_i32()
+            if (name == "print_i32" || name == "println_i32") {
+
+                if (expr->arguments.size() != 1) {
+                    return {Type::makeError()};
+                }
+
+                Type type = Type::makeI32();
+
+                ExprResult argument = checkExpr(
+                    expr->arguments[0],
+                    scope,
+                    context,
+                    &type
+                );
+
+                if (argument.type.isError() || !canAssignment(argument.type, type)) {
+                    return {Type::makeError()};
+                }
+                if (argument.type.isNever()) {
+                    return {Type::makeNever()};
+                }
+
+                return {Type::makeUnit(), false, false};
+            }
+
+            // 从全局符号表中寻找函数
+            auto it = value_map.find(name);
+
+            if (it == value_map.end() || it->second.kind != ValueSymbolKind::Function || !it->second.function) {
+                return {Type::makeError()};
+            }
+
+            return checkFunctionCall(
+                it->second.function,
+                expr->arguments,
+                0,
+                "",
+                scope,
+                context
+            );
+        }
+
+        // 关联调用
+        if (parts.size() != 2 || !parts[0] || !parts[1]) {
+            return {Type::makeError()};
+        }
+
+        if (!parts[1]->generic_arguments.empty()) {
+            return {Type::makeError()};
+        }
+
+        // 获取关联调用所属的类型
+        auto type_path = std::make_shared<ast::Path>();
+        type_path->segments.push_back(parts[0]);
+
+        auto syntax = std::make_shared<ast::TypeSyntax>();
+        syntax->kind = ast::TypeSyntaxKind::Path;
+        syntax->path = type_path;
+
+        Type type = resolveType(
+            syntax,
+            context.self_type
+        );
+
+        if (type.isError()) {
+            return {Type::makeError()};
+        }
+
+        std::string name = parts[1]->name;
+
+        // Box::<T>::new(value)
+        if (type.isBox() && name == "new") {
+
+            if (!type.inner || expr->arguments.size() != 1) {
+                return {Type::makeError()};
+            }
+
+            ExprResult argument = checkExpr(
+                expr->arguments[0],
+                scope,
+                context,
+                type.inner.get()
+            );
+
+            if (argument.type.isError() || !canAssignment(argument.type, *type.inner)) {
+                return {Type::makeError()};
+            }
+            if (argument.type.isNever()) {
+                return {Type::makeNever()};
+            }
+
+            return {type, false, false};
+        }
+
+        // Vec::<T>::new()
+        if (type.isVec() && name == "new") {
+
+            if (!expr->arguments.empty()) {
+                return {Type::makeError()};
+            }
+
+            return {type, false, false};
+        }
+
+        // 用户定义struct的关联函数
+        if (type.isStruct()) {
+
+            auto map = associated_map.find(type.struct_name);
+
+            if (map != associated_map.end()) {
+                auto member = map->second.find(name);
+
+                if (member != map->second.end()) {
+
+                    if (member->second.kind != ValueSymbolKind::Function || !member->second.function) {
+                        return {Type::makeError()};
+                    }
+
+                    auto function = member->second.function;
+
+                    // 没有self，直接检查普通参数
+                    if (!function->receiver) {
+                        return checkFunctionCall(
+                            function,
+                            expr->arguments,
+                            0,
+                            type.struct_name,
+                            scope,
+                            context
+                        );
+                    }
+
+                    // 有self时，第一个参数传入self
+                    if (expr->arguments.empty()) {
+                        return {Type::makeError()};
+                    }
+
+                    Type self = Type::makeStruct(
+                        type.struct_name
+                    );
+
+                    if (function->receiver->kind == ast::ReceiverKind::SharedReference) {
+
+                        self = Type::makeReference(
+                            self,
+                            false
+                        );
+                    }
+
+                    else if (function->receiver->kind == ast::ReceiverKind::MutableReference) {
+
+                        self = Type::makeReference(
+                            self,
+                            true
+                        );
+                    }
+
+                    ExprResult argument = checkExpr(
+                        expr->arguments[0],
+                        scope,
+                        context,
+                        &self
+                    );
+
+                    if (argument.type.isError() || !canAssignment(argument.type, self)) {
+                        return {Type::makeError()};
+                    }
+
+                    // self检查完以后，普通参数从1开始（第0个是self）
+                    return checkFunctionCall(
+                        function,
+                        expr->arguments,
+                        1,
+                        type.struct_name,
+                        scope,
+                        context,
+                        argument.type.isNever()
+                    );
+                }
+            }
+        }
+
+        // 自动生成的Clone
+        if (name == "clone" && hasClone(type)) {
+
+            if (expr->arguments.size() != 1) {
+                return {Type::makeError()};
+            }
+
+            Type ref = Type::makeReference(
+                type,
+                false
+            );
+
+            ExprResult argument = checkExpr(
+                expr->arguments[0],
+                scope,
+                context,
+                &ref
+            );
+
+            if (argument.type.isError() ||
+                !canAssignment(argument.type, ref)) {
+                return {Type::makeError()};
+            }
+
+            if (argument.type.isNever()) {
+                return {Type::makeNever()};
+            }
+
+            return {type, false, false};
+        }
+
         return {Type::makeError()};
     }
 } // namespace rx::semantic
