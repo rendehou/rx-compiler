@@ -160,6 +160,13 @@ namespace rx::semantic {
         // 判断类型是否实现Copy
         bool hasCopy(const Type& type) const;
 
+        // 判断类型是否实现Clone
+        bool hasClone(const Type& type) const;
+
+        bool hasClone(
+            const Type& type,
+            std::vector<std::string>& visiting
+        ) const;
 
         ExprResult checkFieldAccess(
             const std::shared_ptr<ast::FieldAccessExpr>& expr,
@@ -190,6 +197,8 @@ namespace rx::semantic {
             Scope& scope,
             CheckContext& context
         );
+
+        bool checkStructDerives(const std::shared_ptr<ast::StructItem>& structure) const;
 
         // 条件和循环
         ExprResult checkIf(

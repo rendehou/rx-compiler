@@ -368,6 +368,7 @@ namespace rx::semantic {
         if (!expr) {
             return {Type::makeError()};
         }
+
         // 以下几个种类可以直接解决
         // 具体数
         if (auto integer = std::dynamic_pointer_cast<ast::IntegerExpr>(expr)) {
@@ -412,16 +413,11 @@ namespace rx::semantic {
 
         // path
         if (auto path_expr = std::dynamic_pointer_cast<ast::PathExpr>(expr)) {
-            return checkPath(
-                path_expr,
-                scope,
-                context
-            );
+            return checkPath(path_expr, scope, context);
         }
 
         // 块语句
         if (auto block_expr = std::dynamic_pointer_cast<ast::BlockExpr>(expr)) {
-
             return checkBlock(
                 block_expr->block,
                 scope,
@@ -430,58 +426,80 @@ namespace rx::semantic {
             );
         }
 
-
-        return {Type::makeError()};
-    }
-
-    ExprResult Checker::checkPath(
-        const std::shared_ptr<ast::PathExpr>& expr,
-        Scope& scope,
-        CheckContext& context
-    ) {
-        if (!expr || !expr->path || expr->path->segments.empty()) {
-            return {Type::makeError()};
+        // 一元运算
+        if (auto unary_expr = std::dynamic_pointer_cast<ast::UnaryExpr>(expr)) {
+            return checkUnary(unary_expr, scope, context);
         }
 
-        // 检验每一个路径非空
-        for (const auto& segment : expr->path->segments) {
-            if (!segment) {
-                return {Type::makeError()};
-            }
+        // 二元运算
+        if (auto binary_expr = std::dynamic_pointer_cast<ast::BinaryExpr>(expr)) {
+            return checkBinary(binary_expr, scope, context);
         }
 
-        // 只有一段path
-        if (expr->path->segments.size() == 1) {
-            const std::string& name =
-                expr->path->segments[0]->name;
-
-            // 在当前scope将name当作变量查找
-            if (auto symbol = scope.find(name)) {
-                return {
-                    symbol->type,
-                    true,
-                    symbol->mutable_binding
-                };
-            }
-            // 在全局常量里继续找name的定义
-            auto global = value_map.find(name);
-            if (global != value_map.end() && global->second.kind == ValueSymbolKind::Constant && global->second.constant) {
-
-                Type type = resolveType(
-                    global->second.constant->type,
-                    context.self_type
-                );
-                if (type.isError()) {
-                    return {Type::makeError()};
-                }
-
-                return {type, false, false};
-            }
-
-            return {Type::makeError()};
+        // 赋值表达式
+        if (auto assignment_expr = std::dynamic_pointer_cast<ast::AssignmentExpr>(expr)) {
+            return checkAssignment(assignment_expr, scope, context);
         }
 
-        // 多段path以后在这里继续处理
+        // 类型转换
+        if (auto cast_expr = std::dynamic_pointer_cast<ast::CastExpr>(expr)) {
+            return checkCast(cast_expr, scope, context);
+        }
+
+        // 字段访问
+        if (auto field_expr = std::dynamic_pointer_cast<ast::FieldAccessExpr>(expr)) {
+            return checkFieldAccess(field_expr, scope, context);
+        }
+
+        // 数组下标
+        if (auto index_expr = std::dynamic_pointer_cast<ast::IndexExpr>(expr)) {
+            return checkIndex(index_expr, scope, context);
+        }
+
+        // 数组列表
+        if (auto array_list = std::dynamic_pointer_cast<ast::ArrayListExpr>(expr)) {
+            return checkArrayList(array_list, scope, context);
+        }
+
+        // 数组重复
+        if (auto array_repeat = std::dynamic_pointer_cast<ast::ArrayRepeatExpr>(expr)) {
+            return checkArrayRepeat(array_repeat, scope, context);
+        }
+
+        // 结构体初始化
+        if (auto struct_init = std::dynamic_pointer_cast<ast::StructInitExpr>(expr)) {
+            return checkStructInit(struct_init, scope, context);
+        }
+
+        // if表达式
+        if (auto if_expr = std::dynamic_pointer_cast<ast::IfExpr>(expr)) {
+            return checkIf(if_expr, scope, context, expected_type);
+        }
+
+        // while循环
+        if (auto while_expr = std::dynamic_pointer_cast<ast::WhileExpr>(expr)) {
+            return checkWhile(while_expr, scope, context);
+        }
+
+        // loop循环
+        if (auto loop_expr = std::dynamic_pointer_cast<ast::LoopExpr>(expr)) {
+            return checkLoop(loop_expr, scope, context);
+        }
+
+        // return
+        if (auto return_expr = std::dynamic_pointer_cast<ast::ReturnExpr>(expr)) {
+            return checkReturn(return_expr, scope, context);
+        }
+
+        // break
+        if (auto break_expr = std::dynamic_pointer_cast<ast::BreakExpr>(expr)) {
+            return checkBreak(break_expr, scope, context);
+        }
+
+        // continue
+        if (auto continue_expr = std::dynamic_pointer_cast<ast::ContinueExpr>(expr)) {
+            return checkContinue(continue_expr, scope, context);
+        }
 
         return {Type::makeError()};
     }
@@ -1232,6 +1250,100 @@ namespace rx::semantic {
         return false;
     }
 
+    
+    // 判断类型是否实现Clone，要不实现，要不结构体derive且天生可以clone
+    bool Checker::hasClone(const Type& type) const {
+
+        std::vector<std::string> visiting;
+        return hasClone(type, visiting);
+    }
+
+    bool Checker::hasClone(
+        const Type& type,
+        std::vector<std::string>& visiting
+    ) const {
+
+        if (type.isInteger() || type.isBool() || type.isUnit()) {
+            return true;
+        }
+
+        // 共享引用可以Clone，可变引用不可以
+        if (type.isReference()) {
+            return type.inner && !type.mutable_reference;
+        }
+
+        // 数组、Box、Vec的内部类型必须支持Clone
+        if (type.isArray() || type.isBox() || type.isVec()) {
+            return type.inner && hasClone(*type.inner, visiting);
+        }
+
+        // 结构体必须derive Clone
+        if (type.isStruct()) {
+
+            auto structure = struct_map.find(type.struct_name);
+
+            if (structure == struct_map.end() || !structure->second) {
+                return false;
+            }
+
+            bool has_clone = false;
+
+            for (const auto& attribute : structure->second->attributes) {
+
+                if (!attribute) {
+                    continue;
+                }
+
+                for (auto trait : attribute->traits) {
+                    if (trait == ast::DeriveTrait::Clone) {
+                        has_clone = true;
+                    }
+                }
+            }
+
+            if (!has_clone) {
+                return false;
+            }
+
+            // 防止递归结构体导致无限递归
+            for (const auto& name : visiting) {
+                if (name == type.struct_name) {
+                    return true;
+                }
+            }
+
+            visiting.push_back(type.struct_name);
+
+            // 所有字段也需要支持Clone
+            for (const auto& field : structure->second->fields) {
+
+                if (!field || !field->type) {
+                    visiting.pop_back();
+                    return false;
+                }
+
+                Type field_type = resolveType(
+                    field->type,
+                    type.struct_name
+                );
+
+                if (field_type.isError() ||
+                    !hasClone(field_type, visiting)) {
+
+                    visiting.pop_back();
+                    return false;
+                }
+            }
+
+            visiting.pop_back();
+
+            return true;
+        }
+
+        return false;
+    }
+
+
     ExprResult Checker::checkIndex(
         const std::shared_ptr<ast::IndexExpr>& expr,
         Scope& scope,
@@ -1596,6 +1708,61 @@ namespace rx::semantic {
             return {Type::makeNever()};
         }
         return {Type::makeStruct(struct_name), false, false};
+    }
+
+    bool Checker::checkStructDerives(const std::shared_ptr<ast::StructItem>& structure) const {
+
+        if (!structure) {
+            return false;
+        }
+
+        bool has_copy = false;
+        bool has_clone = false;
+
+        std::vector<ast::DeriveTrait> traits;
+
+        for (const auto& attribute : structure->attributes) {
+
+            if (!attribute) {
+                return false;
+            }
+
+            for (auto trait : attribute->traits) {
+
+                // 检查derive是否重复
+                for (auto appeared : traits) {
+                    if (appeared == trait) {
+                        return false;
+                    }
+                }
+
+                traits.push_back(trait);
+
+                if (trait == ast::DeriveTrait::Copy) {
+                    has_copy = true;
+                }
+                if (trait == ast::DeriveTrait::Clone) {
+                    has_clone = true;
+                }
+            }
+        }
+
+        // derive Copy必须同时能derive Clone
+        if (has_copy && !has_clone) {
+            return false;
+        }
+
+        Type struct_type = Type::makeStruct(structure->name);
+
+        // 检查是否真的如derive声明
+        if (has_clone && !hasClone(struct_type)) {
+            return false;
+        }
+        if (has_copy && !hasCopy(struct_type)) {
+            return false;
+        }
+
+        return true;
     }
 
     ExprResult Checker::checkIf(
