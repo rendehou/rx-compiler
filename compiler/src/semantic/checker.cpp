@@ -516,6 +516,11 @@ namespace rx::semantic {
             return checkCall(call_expr, scope, context);
         }
 
+        // 方法调用
+        if (auto method_expr = std::dynamic_pointer_cast<ast::MethodCallExpr>(expr)) {
+            return checkMethodCall(method_expr, scope, context);
+        }
+        
         return {Type::makeError()};
     }
 
@@ -2214,8 +2219,59 @@ namespace rx::semantic {
             return {Type::makeError()};
         }
 
-        // 多段path以后继续处理
-        return {Type::makeError()};
+         // 多段path，处理关联常量，例如 A::X 或 Self::X
+        const auto& parts = expr->path->segments;
+
+        if (parts.size() != 2 || parts[0]->name.empty() || 
+            parts[1]->name.empty() || !parts[1]->generic_arguments.empty()) {
+            return {Type::makeError()};
+        }
+
+        // 将第一段路径解析成类型
+        auto type_path = std::make_shared<ast::Path>();
+        type_path->segments.push_back(parts[0]);
+
+        auto syntax = std::make_shared<ast::TypeSyntax>();
+        syntax->kind = ast::TypeSyntaxKind::Path;
+        syntax->path = type_path;
+
+        Type type = resolveType(
+            syntax,
+            context.self_type
+        );
+
+        // 关联常量必须属于用户定义的struct
+        if (!type.isStruct()) {
+            return {Type::makeError()};
+        }
+
+        // 查找struct对应的关联成员
+        auto map = associated_map.find(type.struct_name);
+
+        if (map == associated_map.end()) {
+            return {Type::makeError()};
+        }
+
+        // 查找对应名称
+        auto member = map->second.find(parts[1]->name);
+
+        if (member == map->second.end() || member->second.kind != ValueSymbolKind::Constant ||
+            !member->second.constant || !member->second.constant->type) {
+            return {Type::makeError()};
+        }
+
+        // 获取关联常量的类型
+        Type result = resolveType(
+            member->second.constant->type,
+            type.struct_name
+        );
+
+        if (result.isError()) {
+            return {Type::makeError()};
+        }
+
+        // 常量不是可以赋值的存储位置
+        return {result, false, false};
     }
 
     // 检查函数的普通参数
