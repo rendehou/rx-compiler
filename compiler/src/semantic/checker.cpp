@@ -36,8 +36,7 @@ namespace rx::semantic {
         // 检查struct的derive是否合法
         for (const auto& item : program->items) {
 
-            if (auto structure =
-                std::dynamic_pointer_cast<ast::StructItem>(item)) {
+            if (auto structure = std::dynamic_pointer_cast<ast::StructItem>(item)) {
 
                 if (!checkStructDerives(structure)) {
                     return false;
@@ -510,6 +509,11 @@ namespace rx::semantic {
         // continue
         if (auto continue_expr = std::dynamic_pointer_cast<ast::ContinueExpr>(expr)) {
             return checkContinue(continue_expr, scope, context);
+        }
+
+        // 函数调用
+        if (auto call_expr = std::dynamic_pointer_cast<ast::CallExpr>(expr)) {
+            return checkCall(call_expr, scope, context);
         }
 
         return {Type::makeError()};
@@ -2408,10 +2412,6 @@ namespace rx::semantic {
             return {Type::makeError()};
         }
 
-        if (!parts[1]->generic_arguments.empty()) {
-            return {Type::makeError()};
-        }
-
         // 获取关联调用所属的类型
         auto type_path = std::make_shared<ast::Path>();
         type_path->segments.push_back(parts[0]);
@@ -2576,4 +2576,324 @@ namespace rx::semantic {
 
         return {Type::makeError()};
     }
+
+    ExprResult Checker::checkMethodCall(
+        const std::shared_ptr<ast::MethodCallExpr>& expr,
+        Scope& scope,
+        CheckContext& context
+    ) {
+        if (!expr || !expr->receiver || !expr->method || expr->method->name.empty()) {
+            return {Type::makeError()};
+        }
+
+        // 先检查receiver
+        ExprResult receiver = checkExpr(
+            expr->receiver,
+            scope,
+            context
+        );
+
+        if (receiver.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        std::string name = expr->method->name;
+
+        Type current_type = receiver.type;
+
+        // 判断当前receiver能不能提供可变访问
+        bool mutable_access;
+
+        if (receiver.is_assignable) {
+            mutable_access = receiver.is_mutable;
+        } else {
+            mutable_access = true;
+        }
+
+        bool crossed_shared = receiver.mutable_access_blocked;
+
+        if (crossed_shared) {
+            mutable_access = false;
+        }
+
+        // 不断自动解引用Reference和Box寻找方法
+        while (true) {
+
+            // 每一层按照 T、&T、&mut T 的顺序查找
+            std::vector<Type> candidates;
+
+            candidates.push_back(current_type);
+            candidates.push_back(
+                Type::makeReference(
+                    current_type,
+                    false
+                )
+            );
+            candidates.push_back(
+                Type::makeReference(
+                    current_type,
+                    true
+                )
+            );
+
+            for (std::size_t i = 0; i < candidates.size(); ++i) {
+
+                const Type& candidate = candidates[i];
+
+                // 查找是否有定义
+                std::string self_type;
+
+                if (candidate.isStruct()) {
+                    self_type = candidate.struct_name;
+                }
+
+                else if (candidate.isReference() && candidate.inner &&
+                        candidate.inner->isStruct()) {
+
+                    self_type = candidate.inner->struct_name;
+                }
+
+                if (!self_type.empty()) {
+
+                    auto map = associated_map.find(self_type);
+                    if (map != associated_map.end()) {
+
+                        auto member = map->second.find(name);
+
+                        if (member != map->second.end() && member->second.kind == ValueSymbolKind::Function &&
+                            member->second.function) {
+
+                            auto function = member->second.function;
+
+                            // 没有self的关联函数不能使用点调用
+                            if (function->receiver) {
+
+                                // 判断需要什么样的self
+                                Type self = Type::makeStruct(
+                                    self_type
+                                );
+                                switch (function->receiver->kind) {
+
+                                    case ast::ReceiverKind::Value:
+                                    case ast::ReceiverKind::MutableValue:
+                                        break;
+
+                                    case ast::ReceiverKind::SharedReference:
+                                        self = Type::makeReference(
+                                            self,
+                                            false
+                                        );
+                                        break;
+
+                                    case ast::ReceiverKind::MutableReference:
+                                        self = Type::makeReference(
+                                            self,
+                                            true
+                                        );
+                                        break;
+                                }
+
+                                // 当前候选类型就是这个方法需要的self
+                                if (self == candidate) {
+
+                                    // 自动生成&mut T时，原位置必须可以修改
+                                    if (i == 2 && !mutable_access) {
+                                        return {Type::makeError()};
+                                    }
+
+                                    // 已有&mut不能再套&
+                                    if (i == 0 && candidate.isReference() &&
+                                        candidate.mutable_reference && crossed_shared) {
+
+                                        return {Type::makeError()};
+                                    }
+
+                                    // 检查普通参数
+                                    return checkFunctionCall(
+                                        function,
+                                        expr->arguments,
+                                        0,
+                                        self_type,
+                                        scope,
+                                        context
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // clone
+                if (name == "clone" &&
+                    candidate.isReference() &&
+                    !candidate.mutable_reference &&
+                    candidate.inner &&
+                    hasClone(*candidate.inner)) {
+
+                    if (!expr->arguments.empty()) {
+                        return {Type::makeError()};
+                    }
+
+                    return {
+                        *candidate.inner,
+                        false,
+                        false
+                    };
+                }
+
+                // 数组的len()
+                if (name == "len" &&
+                    candidate.isReference() &&
+                    !candidate.mutable_reference &&
+                    candidate.inner &&
+                    candidate.inner->isArray()) {
+
+                    if (!expr->arguments.empty()) {
+                        return {Type::makeError()};
+                    }
+
+                    return {
+                        Type::makeUSize(),
+                        false,
+                        false
+                    };
+                }
+
+                // Vec的四种方法
+                if (candidate.isReference() &&
+                    candidate.inner &&
+                    candidate.inner->isVec()) {
+
+                    Type vec = *candidate.inner;
+
+                    if (!vec.inner) {
+                        return {Type::makeError()};
+                    }
+
+                    // len(&self)
+                    if (name == "len" &&
+                        !candidate.mutable_reference) {
+
+                        if (!expr->arguments.empty()) {
+                            return {Type::makeError()};
+                        }
+
+                        return {
+                            Type::makeUSize(),
+                            false,
+                            false
+                        };
+                    }
+
+                    // is_empty(&self)
+                    if (name == "is_empty" &&
+                        !candidate.mutable_reference) {
+
+                        if (!expr->arguments.empty()) {
+                            return {Type::makeError()};
+                        }
+
+                        return {
+                            Type::makeBool(),
+                            false,
+                            false
+                        };
+                    }
+
+                    // push(&mut self, value: T)
+                    if (name == "push" &&
+                        candidate.mutable_reference) {
+
+                        // 自动借用成&mut Vec时必须可以修改
+                        if (i == 2 && !mutable_access) {
+                            return {Type::makeError()};
+                        }
+
+                        // &mut外层不能有&
+                        if (i == 0 && crossed_shared) {
+                            return {Type::makeError()};
+                        }
+
+                        if (expr->arguments.size() != 1) {
+                            return {Type::makeError()};
+                        }
+
+                        Type type = *vec.inner;
+
+                        ExprResult argument = checkExpr(
+                            expr->arguments[0],
+                            scope,
+                            context,
+                            &type
+                        );
+
+                        if (argument.type.isError() || !canAssignment(argument.type, type)) {
+                            return {Type::makeError()};
+                        }
+
+                        if (argument.type.isNever()) {
+                            return {Type::makeNever()};
+                        }
+
+                        return {
+                            Type::makeUnit(),
+                            false,
+                            false
+                        };
+                    }
+
+                    // remove(&mut self, index: usize)
+                    if (name == "remove" && candidate.mutable_reference) {
+
+                        if (i == 2 && !mutable_access) {
+                            return {Type::makeError()};
+                        }
+
+                        if (i == 0 && crossed_shared) {
+                            return {Type::makeError()};
+                        }
+
+                        if (expr->arguments.size() != 1) {
+                            return {Type::makeError()};
+                        }
+
+                        Type usize_type = Type::makeUSize();
+
+                        ExprResult argument = checkExpr(
+                            expr->arguments[0],
+                            scope,
+                            context,
+                            &usize_type
+                        );
+
+                        if (argument.type.isError() || !canAssignment(argument.type, usize_type)) {
+                            return {Type::makeError()};
+                        }
+
+                        if (argument.type.isNever()) {
+                            return {Type::makeNever()};
+                        }
+
+                        return {
+                            *vec.inner,
+                            false,
+                            false
+                        };
+                    }
+                }
+            }
+
+            // 当前这一层找不到，自动解引用一层继续找
+            if (!dereferenceForAccess(
+                    current_type,
+                    mutable_access,
+                    crossed_shared)) {
+                break;
+            }
+        }
+
+        // 所有候选类型都找不到方法
+        return {Type::makeError()};
+    }
+
 } // namespace rx::semantic
