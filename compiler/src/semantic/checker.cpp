@@ -33,6 +33,39 @@ namespace rx::semantic {
             return false;
         }
 
+
+        // 检查程序入口main
+        auto main_it = value_map.find("main");
+
+        if (main_it == value_map.end() ||
+            main_it->second.kind != ValueSymbolKind::Function ||
+            !main_it->second.function) {
+            return false;
+        }
+
+        auto main_function = main_it->second.function;
+
+        // main不能有普通参数或receiver
+        if (main_function->receiver ||
+            !main_function->parameters.empty()) {
+            return false;
+        }
+
+        // main不能带泛型参数
+        if (main_function->generic_parameters &&
+            !main_function->generic_parameters->lifetimes.empty()) {
+            return false;
+        }
+
+        // main返回值必须是Unit
+        Type main_return = main_function->return_type
+            ? resolveType(main_function->return_type)
+            : Type::makeUnit();
+
+        if (!main_return.isUnit()) {
+            return false;
+        }
+
         // 检查struct的derive是否合法
         for (const auto& item : program->items) {
 
@@ -520,7 +553,7 @@ namespace rx::semantic {
         if (auto method_expr = std::dynamic_pointer_cast<ast::MethodCallExpr>(expr)) {
             return checkMethodCall(method_expr, scope, context);
         }
-        
+
         return {Type::makeError()};
     }
 
@@ -579,10 +612,13 @@ namespace rx::semantic {
             case ast::UnaryOperator::Dereference: {
                 // 可以解引用
                 if (operand.type.isReference() && operand.type.inner) {
+
+                    bool blocked = operand.mutable_access_blocked || !operand.type.mutable_reference;
                     return {
                         *operand.type.inner,
                         true,
-                        operand.type.mutable_reference
+                        operand.type.mutable_reference && !operand.mutable_access_blocked,
+                        blocked
                     };
                 }
 
@@ -591,7 +627,8 @@ namespace rx::semantic {
                     return {
                         *operand.type.inner,
                         true,
-                        operand.is_mutable
+                        operand.is_mutable && !operand.mutable_access_blocked,
+                        operand.mutable_access_blocked
                     };
                 }
 

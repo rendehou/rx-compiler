@@ -196,12 +196,36 @@ namespace rx::semantic {//type负责声明用到的所有类型。
             const std::string& name = segment->name;
 
             //简单类型
-            if (name == "i32") return Type::makeI32();
-            if (name == "u32") return Type::makeU32();
-            if (name == "isize") return Type::makeISize();
-            if (name == "usize") return Type::makeUSize();
-            if (name == "bool") return Type::makeBool();
-
+            if (name == "i32") {
+                if (!segment->generic_arguments.empty()) {
+                    return Type::makeError();
+                }
+                return Type::makeI32();
+            }
+            if (name == "u32") {
+                if (!segment->generic_arguments.empty()) {
+                    return Type::makeError();
+                }
+                return Type::makeU32();
+            }
+            if (name == "isize") {
+                if (!segment->generic_arguments.empty()) {
+                    return Type::makeError();
+                }
+                return Type::makeISize();
+            }
+            if (name == "usize") {
+                if (!segment->generic_arguments.empty()) {
+                    return Type::makeError();
+                }
+                return Type::makeUSize();
+            }
+            if (name == "bool") {
+                if (!segment->generic_arguments.empty()) {
+                    return Type::makeError();
+                }
+                return Type::makeBool();
+            }
             if (name == "Self") {//自身
                 if (self_type.empty()) return Type::makeError();
                 return Type::makeStruct(self_type);
