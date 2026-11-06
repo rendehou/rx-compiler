@@ -273,7 +273,7 @@ namespace rx::semantic {
                 return {Type::makeNever()};
             }
 
-            return tail_result;
+            return {tail_result.type, false, false};
         }
 
         // 没有tail
