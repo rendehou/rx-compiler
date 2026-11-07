@@ -2442,6 +2442,14 @@ namespace rx::semantic {
 
             std::string name = parts[0]->name;
 
+            // 普通函数不支持类型泛型，只允许生命周期
+            for (const auto& argument : parts[0]->generic_arguments) {
+
+                if (!argument || argument->kind != ast::GenericArgumentKind::Lifetime) {
+                    return {Type::makeError()};
+                }
+            }
+
             // 局部变量会覆盖同名函数
             if (scope.find(name)) {
                 return {Type::makeError()};
@@ -2677,6 +2685,14 @@ namespace rx::semantic {
     ) {
         if (!expr || !expr->receiver || !expr->method || expr->method->name.empty()) {
             return {Type::makeError()};
+        }
+
+        // 方法不支持类型泛型，只允许生命周期
+        for (const auto& argument : expr->method->generic_arguments) {
+
+            if (!argument || argument->kind != ast::GenericArgumentKind::Lifetime) {
+                return {Type::makeError()};
+            }
         }
 
         // 先检查receiver

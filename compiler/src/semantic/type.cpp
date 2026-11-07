@@ -266,7 +266,16 @@ namespace rx::semantic {//type负责声明用到的所有类型。
                 return Type::makeVec(inner);
             }
 
-            if (struct_map.find(name) != struct_map.end()) {//用户定义的struct
+            if (struct_map.find(name) != struct_map.end()) {
+
+                // struct的泛型参数只能是生命周期
+                for (const auto& argument : segment->generic_arguments) {
+
+                    if (!argument || argument->kind != rx::ast::GenericArgumentKind::Lifetime) {
+                        return Type::makeError();
+                    }
+                }
+
                 return Type::makeStruct(name);
             }
 
