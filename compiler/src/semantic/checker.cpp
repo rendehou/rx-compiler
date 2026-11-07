@@ -344,6 +344,13 @@ namespace rx::semantic {
                     // 没有显式类型，通过初始化值推断
                     variable_type = initializer.type;
                 }
+
+                // 只读位置不能向外提供可变引用
+                if (initializer.mutable_access_blocked &&
+                    variable_type.isReference() &&
+                    variable_type.mutable_reference) {
+                    return {Type::makeError()};
+                }
             }
 
             // 没有类型，也没有初始化值
@@ -915,6 +922,7 @@ namespace rx::semantic {
 
         // 检查右侧
         const Type* expected_value_type = nullptr;
+        
 
         // 除了左右移位，这个赋值都应该类型相同
         if (expr->op != ast::AssignmentOperator::ShiftLeft && expr->op != ast::AssignmentOperator::ShiftRight) {
@@ -927,6 +935,12 @@ namespace rx::semantic {
             context,
             expected_value_type
         );
+
+        if (value.mutable_access_blocked &&
+            place.type.isReference() &&
+            place.type.mutable_reference) {
+            return {Type::makeError()};
+        }
 
         if (value.type.isError()) {
             return {Type::makeError()};
@@ -1724,6 +1738,12 @@ namespace rx::semantic {
                 context,
                 &field_type
             );
+            
+            if (value.mutable_access_blocked &&
+                field_type.isReference() &&
+                field_type.mutable_reference) {
+                return {Type::makeError()};
+            }
 
             if (value.type.isError()) {
                 return {Type::makeError()};
@@ -2119,6 +2139,12 @@ namespace rx::semantic {
             &context.return_type
         );
 
+        if (value.mutable_access_blocked &&
+            context.return_type.isReference() &&
+            context.return_type.mutable_reference) {
+            return {Type::makeError()};
+        }
+
         if (value.type.isError()) {
             return {Type::makeError()};
         }
@@ -2361,7 +2387,12 @@ namespace rx::semantic {
             if (!canAssignment(argument.type, type)) {
                 return false;
             }
-
+            // 参数要求可变引用时，不能来自被限制的访问位置
+            if (argument.mutable_access_blocked &&
+                type.isReference() &&
+                type.mutable_reference) {
+                return false;
+            }
             if (argument.type.isNever()) {
                 fasan = true;
             }
