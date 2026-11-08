@@ -68,7 +68,7 @@ namespace rx::semantic {
 
         // main不能带泛型参数
         if (main_function->generic_parameters &&
-            !main_function->generic_parameters->lifetimes.empty()) {
+            main_function->generic_parameters->written) {
             return false;
         }
 
@@ -1575,9 +1575,12 @@ namespace rx::semantic {
             }
             else {
                 // 如果不能赋值，就尝试使用当前元素的类型作为新的共同类型
-                if (!canAssignment(result.type, element_type) && canAssignment(element_type, result.type)) {
+                if (canAssignment(result.type, element_type)) {
+                    // 当前元素可以赋给已有共同类型，不需要修改
+                }
+                else if (canAssignment(element_type, result.type)) {
 
-                    // 之前所有元素也必须能够转换为新类型
+                    // 需要扩大共同类型时，重新检查前面的元素
                     for (const auto& previous : previous_types) {
                         if (!canAssignment(previous, result.type)) {
                             return {Type::makeError()};
