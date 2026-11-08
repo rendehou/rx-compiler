@@ -84,7 +84,7 @@ namespace rx::semantic {
                 return false;
             }
 
-            Type type = resolveType(field->type);
+            Type type = resolveType(field->type, name);
 
             if (type.isError() || !checkTypeLayout(type, states)) {
                 states[name] = structState::Unvisited;
@@ -134,7 +134,7 @@ namespace rx::semantic {
 
             field_names.insert(field->name);
 
-            Type type = resolveType(field->type);
+            Type type = resolveType(field->type,structure->name);
             if (type.isError()) return false; //类型不合法
         }
         

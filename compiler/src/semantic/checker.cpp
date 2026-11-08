@@ -30,24 +30,24 @@ namespace rx::semantic {
 
         // 检查全局声明
         if (!checkDeclarations(program)) {
-            // 检查所有全局常量
-            ConstEvaluator evaluator;
-
-            for (const auto& item : program->items) {
-                auto constant = std::dynamic_pointer_cast<ast::ConstantItem>(item);
-
-                if (!constant) {
-                    continue;
-                }
-
-                ConstValue value;
-                if (!evaluator.evaluateConstant(constant, value)) {
-                    return false;
-                }
-            }
             return false;
         }
 
+        // 检查所有全局常量
+        ConstEvaluator evaluator;
+
+        for (const auto& item : program->items) {
+            auto constant = std::dynamic_pointer_cast<ast::ConstantItem>(item);
+
+            if (!constant) {
+                continue;
+            }
+
+            ConstValue value;
+            if (!evaluator.evaluateConstant(constant, value)) {
+                return false;
+            }
+        }
 
         // 检查程序入口main
         auto main_it = value_map.find("main");
