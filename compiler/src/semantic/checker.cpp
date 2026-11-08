@@ -1867,7 +1867,25 @@ namespace rx::semantic {
         if (has_copy && !hasCopy(struct_type)) {
             return false;
         }
+        
+        // derive PartialEq时，所有字段也必须支持PartialEq
+        if (has_partial_eq) {
+            for (const auto& field : structure->fields) {
 
+                if (!field || !field->type) {
+                    return false;
+                }
+
+                Type field_type = resolveType(
+                    field->type,
+                    structure->name
+                );
+
+                if (field_type.isError() || !hasPartialEq(field_type)) {
+                    return false;
+                }
+            }
+        }
         return true;
     }
 
