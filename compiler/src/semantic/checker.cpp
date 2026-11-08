@@ -30,6 +30,21 @@ namespace rx::semantic {
 
         // 检查全局声明
         if (!checkDeclarations(program)) {
+            // 检查所有全局常量
+            ConstEvaluator evaluator;
+
+            for (const auto& item : program->items) {
+                auto constant = std::dynamic_pointer_cast<ast::ConstantItem>(item);
+
+                if (!constant) {
+                    continue;
+                }
+
+                ConstValue value;
+                if (!evaluator.evaluateConstant(constant, value)) {
+                    return false;
+                }
+            }
             return false;
         }
 
@@ -1738,7 +1753,6 @@ namespace rx::semantic {
                 context,
                 &field_type
             );
-            
             if (value.mutable_access_blocked &&
                 field_type.isReference() &&
                 field_type.mutable_reference) {
@@ -1795,6 +1809,8 @@ namespace rx::semantic {
 
         bool has_copy = false;
         bool has_clone = false;
+        bool has_eq = false;
+        bool has_partial_eq = false;
 
         std::vector<ast::DeriveTrait> traits;
 
@@ -1821,11 +1837,21 @@ namespace rx::semantic {
                 if (trait == ast::DeriveTrait::Clone) {
                     has_clone = true;
                 }
+                if (trait == ast::DeriveTrait::Eq) {
+                    has_eq = true;
+                }
+                if (trait == ast::DeriveTrait::PartialEq) {
+                    has_partial_eq = true;
+                }
             }
         }
 
         // derive Copy必须同时能derive Clone
         if (has_copy && !has_clone) {
+            return false;
+        }
+        // Eq必须同时声明PartialEq
+        if (has_eq && !has_partial_eq) {
             return false;
         }
 
