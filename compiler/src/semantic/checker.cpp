@@ -49,6 +49,24 @@ namespace rx::semantic {
             }
         }
 
+        // 检查所有关联常量，包括未被其他表达式引用的常量
+        for (const auto& owner : associated_map) {
+            for (const auto& member : owner.second) {
+                if (member.second.kind != ValueSymbolKind::Constant) {
+                    continue;
+                }
+
+                ConstValue value;
+                if (!member.second.constant ||
+                    !evaluator.evaluateConstant(
+                        member.second.constant,
+                        value,
+                        owner.first)) {
+                    return false;
+                }
+            }
+        }
+
         // 检查程序入口main
         auto main_it = value_map.find("main");
 
@@ -528,12 +546,12 @@ namespace rx::semantic {
 
         // 数组列表
         if (auto array_list = std::dynamic_pointer_cast<ast::ArrayListExpr>(expr)) {
-            return checkArrayList(array_list, scope, context);
+            return checkArrayList(array_list, scope, context, expected_type);
         }
 
         // 数组重复
         if (auto array_repeat = std::dynamic_pointer_cast<ast::ArrayRepeatExpr>(expr)) {
-            return checkArrayRepeat(array_repeat, scope, context);
+            return checkArrayRepeat(array_repeat, scope, context, expected_type);
         }
 
         // 结构体初始化
@@ -553,7 +571,7 @@ namespace rx::semantic {
 
         // loop循环
         if (auto loop_expr = std::dynamic_pointer_cast<ast::LoopExpr>(expr)) {
-            return checkLoop(loop_expr, scope, context);
+            return checkLoop(loop_expr, scope, context, expected_type);
         }
 
         // return
@@ -1545,7 +1563,8 @@ namespace rx::semantic {
     ExprResult Checker::checkArrayList(
         const std::shared_ptr<ast::ArrayListExpr>& expr,
         Scope& scope,
-        CheckContext& context
+        CheckContext& context,
+        const Type* expected_type
     ) {
         if (!expr) {
             return {Type::makeError()};
@@ -1558,6 +1577,11 @@ namespace rx::semantic {
 
         std::vector<Type> previous_types;
 
+        const Type* expected_element = nullptr;
+        if (expected_type && expected_type->isArray() && expected_type->inner) {
+            expected_element = expected_type->inner.get();
+        }
+
         // 逐个检查数组元素
         for (const auto& element : expr->elements) {
 
@@ -1568,10 +1592,17 @@ namespace rx::semantic {
             ExprResult result = checkExpr(
                 element,
                 scope,
-                context
+                context,
+                expected_element
             );
 
             if (result.type.isError()) {
+                return {Type::makeError()};
+            }
+
+            if (expected_element &&
+                !result.type.isNever() &&
+                !canAssignment(result.type, *expected_element)) {
                 return {Type::makeError()};
             }
 
@@ -1630,7 +1661,8 @@ namespace rx::semantic {
     ExprResult Checker::checkArrayRepeat(
         const std::shared_ptr<ast::ArrayRepeatExpr>& expr,
         Scope& scope,
-        CheckContext& context
+        CheckContext& context,
+        const Type* expected_type
     ) {
         if (!expr || !expr->element || !expr->count) {
             return {Type::makeError()};
@@ -1649,14 +1681,26 @@ namespace rx::semantic {
 
         std::uint64_t count = count_value.unsigned_value;
 
+        const Type* expected_element = nullptr;
+        if (expected_type && expected_type->isArray() && expected_type->inner) {
+            expected_element = expected_type->inner.get();
+        }
+
         // 检查重复的元素
         ExprResult element = checkExpr(
             expr->element,
             scope,
-            context
+            context,
+            expected_element
         );
 
         if (element.type.isError()) {
+            return {Type::makeError()};
+        }
+
+        if (expected_element &&
+            !element.type.isNever() &&
+            !canAssignment(element.type, *expected_element)) {
             return {Type::makeError()};
         }
 
@@ -2056,12 +2100,17 @@ namespace rx::semantic {
         // 检查condition bool或never
         Type bool_type = Type::makeBool();
 
+        std::size_t old_jump_floor = context.loop_jump_floor;
+        context.loop_jump_floor = context.loops.size();
+
         ExprResult condition = checkExpr(
             expr->condition,
             scope,
             context,
             &bool_type
         );
+
+        context.loop_jump_floor = old_jump_floor;
 
         if (condition.type.isError()) {
             return {Type::makeError()};
@@ -2108,7 +2157,8 @@ namespace rx::semantic {
     ExprResult Checker::checkLoop(
         const std::shared_ptr<ast::LoopExpr>& expr,
         Scope& scope,
-        CheckContext& context
+        CheckContext& context,
+        const Type* expected_type
     ) {
         if (!expr || !expr->body) {
             return {Type::makeError()};
@@ -2117,6 +2167,7 @@ namespace rx::semantic {
         // 进入loop循环
         LoopContext loop;
         loop.allow_value_break = true;
+        loop.expected_type = expected_type;
 
         context.loops.push_back(loop);
 
@@ -2227,8 +2278,8 @@ namespace rx::semantic {
             return {Type::makeError()};
         }
 
-        // 不在循环内部不能break
-        if (context.loops.empty()) {
+        // 不在可跳转的循环内部不能break
+        if (context.loops.size() <= context.loop_jump_floor) {
             return {Type::makeError()};
         }
 
@@ -2281,8 +2332,8 @@ namespace rx::semantic {
             return {Type::makeError()};
         }
 
-        // 不在循环内部不能continue
-        if (context.loops.empty()) {
+        // 不在可跳转的循环内部不能continue
+        if (context.loops.size() <= context.loop_jump_floor) {
             return {Type::makeError()};
         }
 
@@ -2655,6 +2706,92 @@ namespace rx::semantic {
             }
 
             return {type, false, false};
+        }
+
+        // Vec显式关联调用不会自动借用第一个参数
+        if (type.isVec() && type.inner) {
+
+            if (name == "len" || name == "is_empty") {
+                if (expr->arguments.size() != 1) {
+                    return {Type::makeError()};
+                }
+
+                Type receiver_type = Type::makeReference(type, false);
+                ExprResult receiver = checkExpr(
+                    expr->arguments[0], scope, context, &receiver_type
+                );
+
+                if (receiver.type.isError() ||
+                    !canAssignment(receiver.type, receiver_type)) {
+                    return {Type::makeError()};
+                }
+                if (receiver.type.isNever()) {
+                    return {Type::makeNever()};
+                }
+
+                return {
+                    name == "len" ? Type::makeUSize() : Type::makeBool(),
+                    false,
+                    false
+                };
+            }
+
+            if (name == "push") {
+                if (expr->arguments.size() != 2) {
+                    return {Type::makeError()};
+                }
+
+                Type receiver_type = Type::makeReference(type, true);
+                ExprResult receiver = checkExpr(
+                    expr->arguments[0], scope, context, &receiver_type
+                );
+                ExprResult value = checkExpr(
+                    expr->arguments[1], scope, context, type.inner.get()
+                );
+
+                if (receiver.type.isError() || value.type.isError() ||
+                    !canAssignment(receiver.type, receiver_type) ||
+                    !canAssignment(value.type, *type.inner)) {
+                    return {Type::makeError()};
+                }
+                if (receiver.mutable_access_blocked) {
+                    return {Type::makeError()};
+                }
+                if (receiver.type.isNever() || value.type.isNever()) {
+                    return {Type::makeNever()};
+                }
+
+                return {Type::makeUnit(), false, false};
+            }
+
+            if (name == "remove") {
+                if (expr->arguments.size() != 2) {
+                    return {Type::makeError()};
+                }
+
+                Type receiver_type = Type::makeReference(type, true);
+                Type index_type = Type::makeUSize();
+                ExprResult receiver = checkExpr(
+                    expr->arguments[0], scope, context, &receiver_type
+                );
+                ExprResult index = checkExpr(
+                    expr->arguments[1], scope, context, &index_type
+                );
+
+                if (receiver.type.isError() || index.type.isError() ||
+                    !canAssignment(receiver.type, receiver_type) ||
+                    !canAssignment(index.type, index_type)) {
+                    return {Type::makeError()};
+                }
+                if (receiver.mutable_access_blocked) {
+                    return {Type::makeError()};
+                }
+                if (receiver.type.isNever() || index.type.isNever()) {
+                    return {Type::makeNever()};
+                }
+
+                return {*type.inner, false, false};
+            }
         }
 
         // 用户定义struct的关联函数

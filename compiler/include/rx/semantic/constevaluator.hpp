@@ -31,13 +31,15 @@ namespace rx::semantic {
 
         bool evaluateConstant(//处理一整个赋值表达
             const std::shared_ptr<ast::ConstantItem>& constant,
-            ConstValue& result
+            ConstValue& result,
+            const std::string& self_type = ""
         );
 
         bool evaluateValue(//int bool negate path
             const std::shared_ptr<ast::ConstValueSyntax>& value,
             const Type& expected_type,
-            ConstValue& result
+            ConstValue& result,
+            const std::string& self_type = ""
         );
 
         const ConstValue* find(//查询已经有的值，在values里面找
@@ -49,6 +51,12 @@ namespace rx::semantic {
         std::unordered_map<std::string, ConstValue> values_;//变量，常量的值
 
         bool evaluateByName(//根据名称查询是否已经被计算
+            const std::string& name,
+            ConstValue& result
+        );
+
+        bool evaluateAssociated(
+            const std::string& owner,
             const std::string& name,
             ConstValue& result
         );

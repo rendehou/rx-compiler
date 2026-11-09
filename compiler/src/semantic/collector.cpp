@@ -1,6 +1,8 @@
 #include "rx/semantic/collector.hpp"
 #include "rx/semantic/type.hpp"
 
+#include <unordered_set>
+
 //collector负责存变量，函数，结构体名字并判断重复
 namespace rx::semantic{
 
@@ -15,6 +17,7 @@ namespace rx::semantic{
     ) {
         value_map.clear();
         struct_map.clear();
+        associated_map.clear();
 
         for(const auto& item : program->items) {
 
@@ -49,6 +52,14 @@ namespace rx::semantic{
             }
 
             if (auto structure = std::dynamic_pointer_cast<rx::ast::StructItem>(item)) {//function
+
+                static const std::unordered_set<std::string> protected_type_names = {
+                    "i32", "u32", "isize", "usize", "bool", "Box", "Vec"
+                };
+
+                if (protected_type_names.find(structure->name) != protected_type_names.end()) {
+                    return false;
+                }
 
                 if (struct_map.find(structure->name) != struct_map.end()) {
                     return false;//判定失败，名字重了

@@ -7,18 +7,19 @@ namespace rx::semantic {
 
    bool ConstEvaluator::evaluateConstant(//处理整个表达式，并用evaluate value来计算值
         const std::shared_ptr<ast::ConstantItem>& constant,
-        ConstValue& result
+        ConstValue& result,
+        const std::string& self_type
     ) {
         if (!constant) {
             return false;
         }
 
-        Type type = resolveType(constant->type);
+        Type type = resolveType(constant->type, self_type);
 
         if (type.isError()) {
             return false;
         }
-        if (!evaluateValue(constant->initializer, type, result)) {
+        if (!evaluateValue(constant->initializer, type, result, self_type)) {
             return false;
         }
         if (result.type != type) {
@@ -30,7 +31,8 @@ namespace rx::semantic {
     bool ConstEvaluator::evaluateValue(//evaluator具体的值，把ast节点赋值，string变int或者加负号，可递归
         const std::shared_ptr<ast::ConstValueSyntax>& value,
         const Type& type,
-        ConstValue& result
+        ConstValue& result,
+        const std::string& self_type
     ) {
         if (!value) {
             return false;
@@ -69,17 +71,39 @@ namespace rx::semantic {
             }
 
             case ast::ConstValueKind::Path: {
-                if (!value->path || value->path->segments.size() != 1) {
+                if (!value->path || value->path->segments.empty()) {
                     return false;
                 }
-
-                const std::string& name = value->path->segments[0]->name;
 
                 ConstValue referenced;
 
-                if (!evaluateByName(name, referenced)) {
+                if (value->path->segments.size() == 1) {
+                    const auto& segment = value->path->segments[0];
+                    if (!segment || !evaluateByName(segment->name, referenced)) {
+                        return false;
+                    }
+                }
+                else if (value->path->segments.size() == 2) {
+                    const auto& owner_segment = value->path->segments[0];
+                    const auto& name_segment = value->path->segments[1];
+
+                    if (!owner_segment || !name_segment) {
+                        return false;
+                    }
+
+                    std::string owner = owner_segment->name == "Self"
+                        ? self_type
+                        : owner_segment->name;
+
+                    if (owner.empty() ||
+                        !evaluateAssociated(owner, name_segment->name, referenced)) {
+                        return false;
+                    }
+                }
+                else {
                     return false;
                 }
+
                 if (referenced.type != type) {
                     return false;
                 }
@@ -94,7 +118,7 @@ namespace rx::semantic {
                 }
 
                 ConstValue operand;
-                if (!evaluateValue(value->operand, type, operand)) {
+                if (!evaluateValue(value->operand, type, operand, self_type)) {
                     return false;
                 }
 
@@ -154,6 +178,50 @@ namespace rx::semantic {
 
         result = value;
 
+        return true;
+    }
+
+    bool ConstEvaluator::evaluateAssociated(
+        const std::string& owner,
+        const std::string& name,
+        ConstValue& result
+    ) {
+        const std::string key = owner + "::" + name;
+
+        auto state_it = states_.find(key);
+        if (state_it != states_.end()) {
+            if (state_it->second == ConstState::Evaluated) {
+                result = values_.at(key);
+                return true;
+            }
+            if (state_it->second == ConstState::Evaluating) {
+                return false;
+            }
+        }
+
+        auto owner_it = associated_map.find(owner);
+        if (owner_it == associated_map.end()) {
+            return false;
+        }
+
+        auto symbol_it = owner_it->second.find(name);
+        if (symbol_it == owner_it->second.end() ||
+            symbol_it->second.kind != ValueSymbolKind::Constant ||
+            !symbol_it->second.constant) {
+            return false;
+        }
+
+        states_[key] = ConstState::Evaluating;
+
+        ConstValue value;
+        if (!evaluateConstant(symbol_it->second.constant, value, owner)) {
+            states_[key] = ConstState::Unvisited;
+            return false;
+        }
+
+        states_[key] = ConstState::Evaluated;
+        values_[key] = value;
+        result = value;
         return true;
     }
 

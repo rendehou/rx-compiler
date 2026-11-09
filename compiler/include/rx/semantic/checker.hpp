@@ -34,6 +34,7 @@ namespace rx::semantic {
 
         std::string self_type;
         std::vector<LoopContext> loops;// 判断当前进入了哪些循环的记录栈，用来给break，return等判断当前循环
+        std::size_t loop_jump_floor = 0;
     };
 
     
@@ -206,13 +207,15 @@ namespace rx::semantic {
         ExprResult checkArrayList(
             const std::shared_ptr<ast::ArrayListExpr>& expr,
             Scope& scope,
-            CheckContext& context
+            CheckContext& context,
+            const Type* expected_type = nullptr
         );
 
         ExprResult checkArrayRepeat(
             const std::shared_ptr<ast::ArrayRepeatExpr>& expr,
             Scope& scope,
-            CheckContext& context
+            CheckContext& context,
+            const Type* expected_type = nullptr
         );
 
         ExprResult checkStructInit(
@@ -240,7 +243,8 @@ namespace rx::semantic {
         ExprResult checkLoop(
             const std::shared_ptr<ast::LoopExpr>& expr,
             Scope& scope,
-            CheckContext& context
+            CheckContext& context,
+            const Type* expected_type = nullptr
         );
 
         ExprResult checkReturn(

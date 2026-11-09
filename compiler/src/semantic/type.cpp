@@ -1,5 +1,6 @@
 #include "rx/semantic/type.hpp"
 #include "rx/semantic/collector.hpp"
+#include "rx/semantic/constevaluator.hpp"
 #include "rx/ast/type_syntax.hpp"
 #include <utility>
 
@@ -177,14 +178,23 @@ namespace rx::semantic {//type负责声明用到的所有类型。
             Type inner = resolveType(syntax->array_element, self_type);//数组存的变量类型,递归处理内层
             if (inner.isError()) return Type::makeError();
 
-            if (!syntax->length ||
-                syntax->length->kind != rx::ast::ConstValueKind::Integer) {
+            if (!syntax->length) {
                 return Type::makeError();
-            }//已经是整数
+            }
 
-            std::uint64_t length = std::stoull(syntax->length->integer_spelling);//将数组原有的长度从字符串转换为ll
+            ConstEvaluator evaluator;
+            ConstValue length;
+            Type usize_type = Type::makeUSize();
 
-            return Type::makeArray(inner, length);
+            if (!evaluator.evaluateValue(
+                    syntax->length,
+                    usize_type,
+                    length,
+                    self_type)) {
+                return Type::makeError();
+            }
+
+            return Type::makeArray(inner, length.unsigned_value);
         }
 
         if (syntax->kind == rx::ast::TypeSyntaxKind::Path) {
