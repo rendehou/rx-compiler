@@ -799,6 +799,19 @@ namespace rx::frontend {
             );
         }
 
+        // 如果末尾是没有分号的块表达式，则将它作为tail
+        if (!block->tail && !block->statements.empty()) {
+
+            auto expression = std::dynamic_pointer_cast<
+                ast::ExpressionStatement
+            >(block->statements.back());
+
+            if (expression && !expression->has_semicolon) {
+                block->tail = expression->expression;
+                block->statements.pop_back();
+            }
+        }
+        
         return std::static_pointer_cast<ast::AstNode>(
             block
         );

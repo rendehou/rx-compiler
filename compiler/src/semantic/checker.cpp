@@ -288,6 +288,11 @@ namespace rx::semantic {
                 return {Type::makeNever()};
             }
 
+            // 即使前面的语句已经发散，tail仍必须符合预期类型
+            if (expected_type && !canAssignment(tail_result.type, *expected_type)) {
+                return {Type::makeError()};
+            }
+
             return {tail_result.type, false, false};
         }
 
@@ -604,11 +609,19 @@ namespace rx::semantic {
         switch (expr->op) {
 
             case ast::UnaryOperator::Negate: {
-                if (operand.type.isSignedInteger()) {//整数取负
-                    return {operand.type, false, false};
+
+                Type type;
+
+                // 支持有符号整数，以及一层共享引用
+                if (!getIntegerOperandType(operand.type, type)) {
+                    return {Type::makeError()};
                 }
 
-                return {Type::makeError()};
+                if (!type.isSignedInteger()) {
+                    return {Type::makeError()};
+                }
+
+                return {type, false, false};
             }
 
             case ast::UnaryOperator::Not: {
