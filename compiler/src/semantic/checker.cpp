@@ -301,15 +301,17 @@ namespace rx::semantic {
                 return {Type::makeError()};
             }
 
+            // 即使前面的语句已经发散，tail仍必须符合预期类型
+            if (expected_type && !canAssignment(tail_result.type, *expected_type)) {
+                return {Type::makeError()};
+            }
+            
             // 前面的语句已经发散，或者tail本身发散
             if (fasan || tail_result.type.isNever()) {
                 return {Type::makeNever()};
             }
 
-            // 即使前面的语句已经发散，tail仍必须符合预期类型
-            if (expected_type && !canAssignment(tail_result.type, *expected_type)) {
-                return {Type::makeError()};
-            }
+            
 
             return {tail_result.type, false, false};
         }
