@@ -183,7 +183,7 @@ namespace rx::ir{
         const IRValue& value,
         const IRValue& address
     ) {
-        
+
         if (address.type.kind != IRTypeKind::Pointer) {
             throw std::runtime_error("Store address must be a pointer");
         }
@@ -198,8 +198,118 @@ namespace rx::ir{
         appendInstruction(inst);
     }
 
+    IRValue IRBuilder::createGEP(
+        const IRType& source_type,//原元素类型
+        const IRValue& address,
+        const std::vector<IRValue>& indices//代表索引条目
+    ) {
+        //是一个代表位置的指针，格式是[原元素类型]，数组起始地址，跳过几个完整数组，数组中的下标等
+        if (address.type.kind != IRTypeKind::Pointer) {
+            throw std::runtime_error("Invalid GEP address");
+        }
+
+        if (source_type.kind == IRTypeKind::Void || indices.empty()) {
+            throw std::runtime_error("Invalid GEP source type or indices");
+        }
+
+        for (const IRValue& index : indices) {//index需要是integer
+            if (index.type.kind != IRTypeKind::Integer) {
+                throw std::runtime_error("Invalid GEP index");
+            }
+        }
+
+        IRInstruction inst;
+        inst.opcode = IROpcode::GetElementPtr;
+        inst.source_type = source_type;
+
+        //塞入首地址和所有索引条目
+        inst.operands.push_back(address);
+        for (const IRValue& index : indices) {
+            inst.operands.push_back(index);
+        }
+
+        IRType type;
+        type.kind = IRTypeKind::Pointer;
+
+        IRValue result = makeTemporary(type);
+        inst.has_result = true;
+        inst.result = result;
+
+        appendInstruction(inst);
+
+        return result;
+    }
+
+    IRValue IRBuilder::createCall(
+        const IRValue& callee,
+        const IRType& return_type,
+        const std::vector<IRValue>& arguments
+    ) {
+        if (callee.kind != IRValueKind::Global &&
+            callee.type.kind != IRTypeKind::Pointer) {
+            throw std::runtime_error("Invalid callee");
+        }
+
+        IRInstruction inst;
+        inst.opcode = IROpcode::Call;
+        inst.callee = callee;
+        inst.operands = arguments;
+        inst.source_type = return_type;
+
+        if (return_type.kind == IRTypeKind::Void) {//特别的是void无返回内容
+            inst.has_result = false;
+            appendInstruction(inst);
+            return IRValue();
+        }
+
+        IRValue result = makeTemporary(return_type);
+        inst.has_result = true;
+        inst.result = result;
+
+        appendInstruction(inst);
+
+        return result;
+    }
+
+    void IRBuilder::createBr(BlockId target) {
+
+        IRInstruction inst;
+        inst.opcode = IROpcode::Br;
+        inst.targets = {target};
+        inst.has_result = false;
+
+        appendInstruction(inst);
+    }
+
+    void IRBuilder::createCondBr(
+        const IRValue& condition,
+        BlockId true_block,
+        BlockId false_block
+    ) {
+        if (condition.type.kind != IRTypeKind::Integer || condition.type.bits != 1) {
+            throw std::runtime_error("Branch condition must be i1");
+        }
+
+        IRInstruction inst;
+        inst.opcode = IROpcode::CondBr;
+        inst.operands = {condition};
+        inst.targets = {true_block, false_block};
+        inst.has_result = false;
+
+        appendInstruction(inst);
+    }
+
+    IRValue createPhi(
+        const IRType& type,
+        const std::vector<IRPhiIncoming>& incoming//不同phi分支
+    );
+
+    void createRet();
+    void createRet(const IRValue& value);
+    void createUnreachable();
+
     // 辅助函数
-    IRValue IRBuilder::makeTemporary(const IRType& type) {
+    IRValue IRBuilder::makeTemporary(const IRType& type) {//登记SSA的编号
 
         IRValue result;
 
