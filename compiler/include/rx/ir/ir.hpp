@@ -8,7 +8,7 @@
 
 namespace rx::ir {
 
-    using ValueId = std::size_t;
+    using ValueId = std::size_t;//ssa值
     using BlockId = std::size_t;
     using FunctionId = std::size_t;
 
@@ -41,7 +41,7 @@ namespace rx::ir {
 
     struct IRValue {
         IRValueKind kind = IRValueKind::None;
-        IRType type;
+        IRType type;//类型
 
         ValueId id = 0;//编译器内部编号
         std::int64_t integer = 0;
@@ -54,7 +54,7 @@ namespace rx::ir {
         And, Or, Xor, Shl, LShr, AShr,
 
         ICmp,
-        Trunc, ZExt, SExt, BitCast, PtrToInt, IntToPtr,
+        Trunc, ZExt, SExt, BitCast, PtrToInt, IntToPtr,//类型转换
 
         Alloca, Load, Store, GetElementPtr,
         ExtractValue, InsertValue,
@@ -96,13 +96,13 @@ namespace rx::ir {
         bool inbounds = false;//
     };
 
-    struct IRBasicBlock {
+    struct IRBasicBlock {//基本块
         BlockId id = 0;
         std::string name;
         std::vector<IRInstruction> instructions;
     };
 
-    struct IRFunction {
+    struct IRFunction { //函数
         std::string name;
         IRType return_type;
         std::vector<IRValue> parameters;
@@ -117,13 +117,11 @@ namespace rx::ir {
         bool is_constant = false;
     };
 
-    struct IRModule {
-        std::string target_triple;
-        std::string data_layout;
+    struct IRModule { //Ir的顶层块，分发不同子块
 
-        std::vector<IRTypeDef> type_defs;
-        std::vector<IRGlobal> globals;
-        std::vector<IRFunction> functions;
+        std::vector<IRTypeDef> type_defs;//所有结构体
+        std::vector<IRGlobal> globals;//所有变量
+        std::vector<IRFunction> functions;//所有函数
     };
 
 }

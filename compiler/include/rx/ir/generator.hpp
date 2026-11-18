@@ -24,10 +24,9 @@ namespace rx::ir {
         // 正在生成的 IR 模块
         IRModule module_;
 
-        // AST 函数声明 -> IR 函数编号
+        // Ir函数编号
         std::unordered_map<const ast::FunctionItem*, FunctionId> functions_;
 
-        // ========== 顶层声明 ==========
 
         // 第一遍收集函数签名、类型、常量等
         void collectDeclarations(const ast::Program& program);
@@ -40,8 +39,6 @@ namespace rx::ir {
             FunctionId id
         );
 
-        // ========== AST 统一入口 ==========
-
         IRResult generateBlock(
             const ast::Block& block,
             FunctionContext& context
@@ -52,13 +49,10 @@ namespace rx::ir {
             FunctionContext& context
         );
 
-        // 默认按“求值”方式生成表达式
         IRResult generateExpr(
             const ast::Expr& expr,
             FunctionContext& context
         );
-
-        // ========== 具体表达式 ==========
 
         IRResult generateInteger(
             const ast::IntegerExpr& expr,
@@ -153,16 +147,14 @@ namespace rx::ir {
             FunctionContext& context
         );
 
-        // ========== 语句 ==========
-
         IRResult generateLet(
             const ast::LetStatement& statement,
             FunctionContext& context
         );
 
-        // ========== 共通操作 ==========
 
-        // 取得一个表达式代表的存储位置
+        //辅助函数
+        // 取得一个表达式的存储位置
         PlaceResult emitPlace(
             const ast::Expr& expr,
             FunctionContext& context
@@ -181,14 +173,6 @@ namespace rx::ir {
             FunctionContext& context
         );
 
-        // 根据 Rx 类型语义执行值传递
-        void emitTransfer(
-            const IRPlace& target,
-            const IRValue& value,
-            const semantic::Type& type,
-            FunctionContext& context
-        );
-
         // 显式 Clone
         IRResult emitClone(
             const IRValue& value,
@@ -199,9 +183,8 @@ namespace rx::ir {
         // Rx 类型转换为 LLVM IR 类型
         IRType lowerType(const semantic::Type& type);
 
-        // 类型布局
-        std::size_t sizeOf(const semantic::Type& type);
-        std::size_t alignOf(const semantic::Type& type);
+        std::size_t sizeOf(const semantic::Type& type);//判断占位数
+        std::size_t alignOf(const semantic::Type& type);// 调整位数
     };
 
 }
