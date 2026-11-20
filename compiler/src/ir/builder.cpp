@@ -299,14 +299,111 @@ namespace rx::ir{
         appendInstruction(inst);
     }
 
-    IRValue createPhi(
+    IRValue IRBuilder::createPhi(
         const IRType& type,
-        const std::vector<IRPhiIncoming>& incoming//不同phi分支
-    );
+        const std::vector<IRPhiIncoming>& incoming
+    ) {
+        if (function_ >= module_.functions.size()) {
+            throw std::runtime_error("Invalid function");
+        }
+        IRFunction& function = module_.functions[function_];
+        if (current_block_ >= function.blocks.size()) {
+            throw std::runtime_error("Invalid basic block");
+        }
 
-    void createRet();
-    void createRet(const IRValue& value);
-    void createUnreachable();
+        if (isTerminated()) {
+            throw std::runtime_error("Basic block already terminated");
+        }
+
+        if (type.kind == IRTypeKind::Void || incoming.empty()) {
+            throw std::runtime_error("Invalid phi type or incoming");
+        }
+
+        for (const IRPhiIncoming& item : incoming) {//检查phi的各路结果
+            if (item.block >= function.blocks.size()) {
+                throw std::runtime_error("Invalid phi incoming block");
+            }
+
+            if (item.value.type.kind != type.kind ||
+                (type.kind == IRTypeKind::Integer &&
+                item.value.type.bits != type.bits)) {
+                throw std::runtime_error("Phi type mismatch");
+            }
+        }
+
+        IRInstruction inst;
+        inst.opcode = IROpcode::Phi;
+        inst.incoming = incoming;
+
+        IRValue result = makeTemporary(type);
+        inst.has_result = true;
+        inst.result = result;
+
+        IRBasicBlock& block = function.blocks[current_block_];
+
+        std::size_t pos = 0;
+        while (pos < block.instructions.size() && block.instructions[pos].opcode == IROpcode::Phi) {
+            ++pos;
+        }
+
+        block.instructions.insert(
+            block.instructions.begin() + pos,
+            inst
+        );
+
+        return result;
+    }
+
+    void IRBuilder::createRet() {
+        
+        if (function_ >= module_.functions.size()) {
+            throw std::runtime_error("Invalid function");
+        }
+
+        if (module_.functions[function_].return_type.kind != IRTypeKind::Void) {
+            throw std::runtime_error("Function must return a value");
+        }
+
+        IRInstruction inst;
+        inst.opcode = IROpcode::Ret;
+        inst.has_result = false;
+
+        appendInstruction(inst);
+    }
+
+
+    void IRBuilder::createRet(const IRValue& value) {
+        if (function_ >= module_.functions.size()) {
+            throw std::runtime_error("Invalid function");
+        }
+
+        const IRType& return_type = module_.functions[function_].return_type;
+
+        if (return_type.kind == IRTypeKind::Void ||
+            return_type.kind != value.type.kind ||
+            (return_type.kind == IRTypeKind::Integer &&
+            return_type.bits != value.type.bits) ||
+            (return_type.kind == IRTypeKind::NamedStruct &&
+            return_type.name != value.type.name)) {
+            throw std::runtime_error("Return type mismatch");
+        }
+
+        IRInstruction inst;
+        inst.opcode = IROpcode::Ret;
+        inst.operands = {value};
+        inst.has_result = false;
+
+        appendInstruction(inst);
+    }
+
+
+    void IRBuilder::createUnreachable() {
+        IRInstruction inst;
+        inst.opcode = IROpcode::Unreachable;
+        inst.has_result = false;
+
+        appendInstruction(inst);
+    }
 
     // 辅助函数
     IRValue IRBuilder::makeTemporary(const IRType& type) {//登记SSA的编号

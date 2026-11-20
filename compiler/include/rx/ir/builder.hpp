@@ -82,7 +82,6 @@ namespace rx::ir {
         BlockId current_block_ = 0;//当前基本块
         ValueId next_value_ = 0;//下一个产生ssa结果的编号
 
-
         IRValue makeTemporary(const IRType& type);// 分配ssa结果编号
         void appendInstruction(const IRInstruction& inst);// 将操作存储
     };
