@@ -1,37 +1,31 @@
 #pragma once
 
-#include <ostream>
 #include "rx/ir/ir.hpp"
+
+#include <ostream>
 
 namespace rx::ir {
 
     class IRPrinter {
     public:
-        void print(
-            const IRModule& module,
-            std::ostream& out
-        ) const;
+        explicit IRPrinter(const IRModule& module);
+
+        // 将当前 IRModule 输出为 LLVM IR 文本
+        void print(std::ostream& out) const;
 
     private:
-        void printType(
-            const IRType& type,
-            std::ostream& out
-        ) const;
+        const IRModule& module_;
 
-        void printValue(
-            const IRValue& value,
-            std::ostream& out
-        ) const;
+        // 类型、值、指令的输出
+        void printType(std::ostream& out, const IRType& type) const;
+        void printValue(std::ostream& out, const IRValue& value) const;
+        void printTypedValue(std::ostream& out, const IRValue& value) const;
+        void printInstruction(std::ostream& out, const IRInstruction& inst) const;
 
-        void printInstruction(
-            const IRInstruction& instruction,
-            std::ostream& out
-        ) const;
-
-        void printFunction(
-            const IRFunction& function,
-            std::ostream& out
-        ) const;
+        // Module 的各个组成部分
+        void printTypeDef(std::ostream& out, const IRTypeDef& def) const;
+        void printGlobal(std::ostream& out, const IRGlobal& global) const;
+        void printFunction(std::ostream& out, const IRFunction& function) const;
     };
 
-}
+} // namespace rx::ir
