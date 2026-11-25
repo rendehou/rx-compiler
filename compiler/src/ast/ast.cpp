@@ -3,365 +3,412 @@
 #include "rx/ast/program.hpp"
 #include "rx/ast/statement.hpp"
 #include "rx/ast/type_syntax.hpp"
-
+#include <unordered_set>
 #include <utility>
 
 namespace rx::ast {
 
-LifetimeParameter::LifetimeParameter() : AstNode(NodeKind::LifetimeParameter) {}
-AstChildren LifetimeParameter::children() const { return {}; }
+    // 递归遍历 AST，为每个节点分配编号
+    void assignNodeIdsRecursive(
+        const rx::ast::AstNode* node,
+        rx::ast::NodeId& next_id,
+        std::unordered_set<const rx::ast::AstNode*>& visited
+    ) {
+        if (node == nullptr) {
+            return;
+        }
 
-GenericParameters::GenericParameters() : AstNode(NodeKind::GenericParameters) {}
-AstChildren GenericParameters::children() const {
-    AstChildren result;
-    appendChildren(result, lifetimes);
-    return result;
-}
+        // 避免同一个节点被重复编号
+        if (visited.find(node) != visited.end()) {
+            return;
+        }
 
-WherePredicate::WherePredicate() : AstNode(NodeKind::WherePredicate) {}
-AstChildren WherePredicate::children() const {
-    AstChildren result;
-    appendChild(result, type_subject);
-    return result;
-}
+        visited.insert(node);
 
-WhereClause::WhereClause() : AstNode(NodeKind::WhereClause) {}
-AstChildren WhereClause::children() const {
-    AstChildren result;
-    appendChildren(result, predicates);
-    return result;
-}
+        // 分配当前节点的编号
+        node->node_id = next_id++;
 
-FunctionParameter::FunctionParameter() : AstNode(NodeKind::FunctionParameter) {}
-AstChildren FunctionParameter::children() const {
-    AstChildren result;
-    appendChild(result, type);
-    return result;
-}
+        // 获取当前节点的所有子节点
+        rx::ast::AstChildren children = node->children();
 
-Receiver::Receiver() : AstNode(NodeKind::Receiver) {}
-AstChildren Receiver::children() const { return {}; }
-
-UseTree::UseTree() : AstNode(NodeKind::UseTree) {}
-AstChildren UseTree::children() const {
-    AstChildren result;
-    appendChildren(result, group_items);
-    return result;
-}
-
-UseItem::UseItem() : Item(NodeKind::UseItem) {}
-AstChildren UseItem::children() const {
-    AstChildren result;
-    appendChild(result, tree);
-    return result;
-}
-
-FunctionItem::FunctionItem() : Item(NodeKind::FunctionItem) {}
-AstChildren FunctionItem::children() const {
-    AstChildren result;
-    appendChild(result, generic_parameters);
-    appendChild(result, receiver);
-    appendChildren(result, parameters);
-    appendChild(result, return_type);
-    appendChild(result, where_clause);
-    appendChild(result, body);
-    return result;
-}
-
-StructField::StructField() : AstNode(NodeKind::StructField) {}
-AstChildren StructField::children() const {
-    AstChildren result;
-    appendChild(result, type);
-    return result;
-}
-
-DeriveAttribute::DeriveAttribute() : AstNode(NodeKind::DeriveAttribute) {}
-AstChildren DeriveAttribute::children() const { return {}; }
-
-StructItem::StructItem() : Item(NodeKind::StructItem) {}
-AstChildren StructItem::children() const {
-    AstChildren result;
-    appendChild(result, generic_parameters);
-    appendChild(result, where_clause);
-    appendChildren(result, attributes);
-    appendChildren(result, fields);
-    return result;
-}
-
-ConstantItem::ConstantItem() : Item(NodeKind::ConstantItem) {}
-AstChildren ConstantItem::children() const {
-    AstChildren result;
-    appendChild(result, type);
-    appendChild(result, initializer);
-    return result;
-}
-
-AssociatedItem::AssociatedItem() : AstNode(NodeKind::AssociatedItem) {}
-AstChildren AssociatedItem::children() const {
-    AstChildren result;
-    if (const auto* function = std::get_if<std::shared_ptr<FunctionItem>>(&value)) {
-        appendChild(result, *function);
-    } else if (const auto* constant = std::get_if<std::shared_ptr<ConstantItem>>(&value)) {
-        appendChild(result, *constant);
+        // 继续遍历所有子节点
+        for (std::size_t i = 0; i < children.size(); ++i) {
+            assignNodeIdsRecursive(
+                children[i],
+                next_id,
+                visited
+            );
+        }
     }
-    return result;
-}
 
-ImplItem::ImplItem() : Item(NodeKind::ImplItem) {}
-AstChildren ImplItem::children() const {
-    AstChildren result;
-    appendChild(result, generic_parameters);
-    appendChild(result, target_type);
-    appendChild(result, where_clause);
-    appendChildren(result, items);
-    return result;
-}
+    // 对整棵 AST 分配编号
+    void assignNodeIds(const AstNode& root) {
+        NodeId next_id = 0;
 
-EmptyStatement::EmptyStatement() : Statement(NodeKind::EmptyStatement) {}
-AstChildren EmptyStatement::children() const { return {}; }
+        std::unordered_set<const AstNode*> visited;
 
-LetStatement::LetStatement() : Statement(NodeKind::LetStatement) {}
-LetStatement::~LetStatement() = default;
-AstChildren LetStatement::children() const {
-    AstChildren result;
-    appendChild(result, declared_type);
-    appendChild(result, initializer);
-    return result;
-}
+        assignNodeIdsRecursive(
+            &root,
+            next_id,
+            visited
+        );
+    }
 
-ExpressionStatement::ExpressionStatement() : Statement(NodeKind::ExpressionStatement) {}
-ExpressionStatement::~ExpressionStatement() = default;
-AstChildren ExpressionStatement::children() const {
-    AstChildren result;
-    appendChild(result, expression);
-    return result;
-}
+    
+    LifetimeParameter::LifetimeParameter() : AstNode(NodeKind::LifetimeParameter) {}
+    AstChildren LifetimeParameter::children() const { return {}; }
 
-Block::Block() : AstNode(NodeKind::Block) {}
-Block::~Block() = default;
-Block::Block(Block&&) noexcept = default;
-Block& Block::operator=(Block&&) noexcept = default;
-AstChildren Block::children() const {
-    AstChildren result;
-    appendChildren(result, statements);
-    appendChild(result, tail);
-    return result;
-}
+    GenericParameters::GenericParameters() : AstNode(NodeKind::GenericParameters) {}
+    AstChildren GenericParameters::children() const {
+        AstChildren result;
+        appendChildren(result, lifetimes);
+        return result;
+    }
 
-IntegerExpr::IntegerExpr() : Expr(NodeKind::IntegerExpr) {}
-AstChildren IntegerExpr::children() const { return {}; }
+    WherePredicate::WherePredicate() : AstNode(NodeKind::WherePredicate) {}
+    AstChildren WherePredicate::children() const {
+        AstChildren result;
+        appendChild(result, type_subject);
+        return result;
+    }
 
-BooleanExpr::BooleanExpr() : Expr(NodeKind::BooleanExpr) {}
-AstChildren BooleanExpr::children() const { return {}; }
+    WhereClause::WhereClause() : AstNode(NodeKind::WhereClause) {}
+    AstChildren WhereClause::children() const {
+        AstChildren result;
+        appendChildren(result, predicates);
+        return result;
+    }
 
-UnitExpr::UnitExpr() : Expr(NodeKind::UnitExpr) {}
-AstChildren UnitExpr::children() const { return {}; }
+    FunctionParameter::FunctionParameter() : AstNode(NodeKind::FunctionParameter) {}
+    AstChildren FunctionParameter::children() const {
+        AstChildren result;
+        appendChild(result, type);
+        return result;
+    }
 
-PathExpr::PathExpr() : Expr(NodeKind::PathExpr) {}
-AstChildren PathExpr::children() const {
-    AstChildren result;
-    appendChild(result, path);
-    return result;
-}
+    Receiver::Receiver() : AstNode(NodeKind::Receiver) {}
+    AstChildren Receiver::children() const { return {}; }
 
-BlockExpr::BlockExpr() : Expr(NodeKind::BlockExpr) {}
-AstChildren BlockExpr::children() const {
-    AstChildren result;
-    appendChild(result, block);
-    return result;
-}
+    UseTree::UseTree() : AstNode(NodeKind::UseTree) {}
+    AstChildren UseTree::children() const {
+        AstChildren result;
+        appendChildren(result, group_items);
+        return result;
+    }
 
-IfExpr::IfExpr() : Expr(NodeKind::IfExpr) {}
-AstChildren IfExpr::children() const {
-    AstChildren result;
-    appendChild(result, condition);
-    appendChild(result, then_block);
-    appendChild(result, else_branch);
-    return result;
-}
+    UseItem::UseItem() : Item(NodeKind::UseItem) {}
+    AstChildren UseItem::children() const {
+        AstChildren result;
+        appendChild(result, tree);
+        return result;
+    }
 
-WhileExpr::WhileExpr() : Expr(NodeKind::WhileExpr) {}
-AstChildren WhileExpr::children() const {
-    AstChildren result;
-    appendChild(result, condition);
-    appendChild(result, body);
-    return result;
-}
+    FunctionItem::FunctionItem() : Item(NodeKind::FunctionItem) {}
+    AstChildren FunctionItem::children() const {
+        AstChildren result;
+        appendChild(result, generic_parameters);
+        appendChild(result, receiver);
+        appendChildren(result, parameters);
+        appendChild(result, return_type);
+        appendChild(result, where_clause);
+        appendChild(result, body);
+        return result;
+    }
 
-LoopExpr::LoopExpr() : Expr(NodeKind::LoopExpr) {}
-AstChildren LoopExpr::children() const {
-    AstChildren result;
-    appendChild(result, body);
-    return result;
-}
+    StructField::StructField() : AstNode(NodeKind::StructField) {}
+    AstChildren StructField::children() const {
+        AstChildren result;
+        appendChild(result, type);
+        return result;
+    }
 
-BreakExpr::BreakExpr() : Expr(NodeKind::BreakExpr) {}
-AstChildren BreakExpr::children() const {
-    AstChildren result;
-    appendChild(result, value);
-    return result;
-}
+    DeriveAttribute::DeriveAttribute() : AstNode(NodeKind::DeriveAttribute) {}
+    AstChildren DeriveAttribute::children() const { return {}; }
 
-ContinueExpr::ContinueExpr() : Expr(NodeKind::ContinueExpr) {}
-AstChildren ContinueExpr::children() const { return {}; }
+    StructItem::StructItem() : Item(NodeKind::StructItem) {}
+    AstChildren StructItem::children() const {
+        AstChildren result;
+        appendChild(result, generic_parameters);
+        appendChild(result, where_clause);
+        appendChildren(result, attributes);
+        appendChildren(result, fields);
+        return result;
+    }
 
-ReturnExpr::ReturnExpr() : Expr(NodeKind::ReturnExpr) {}
-AstChildren ReturnExpr::children() const {
-    AstChildren result;
-    appendChild(result, value);
-    return result;
-}
+    ConstantItem::ConstantItem() : Item(NodeKind::ConstantItem) {}
+    AstChildren ConstantItem::children() const {
+        AstChildren result;
+        appendChild(result, type);
+        appendChild(result, initializer);
+        return result;
+    }
 
-UnaryExpr::UnaryExpr() : Expr(NodeKind::UnaryExpr) {}
-AstChildren UnaryExpr::children() const {
-    AstChildren result;
-    appendChild(result, operand);
-    return result;
-}
+    AssociatedItem::AssociatedItem() : AstNode(NodeKind::AssociatedItem) {}
+    AstChildren AssociatedItem::children() const {
+        AstChildren result;
+        if (const auto* function = std::get_if<std::shared_ptr<FunctionItem>>(&value)) {
+            appendChild(result, *function);
+        } else if (const auto* constant = std::get_if<std::shared_ptr<ConstantItem>>(&value)) {
+            appendChild(result, *constant);
+        }
+        return result;
+    }
 
-BinaryExpr::BinaryExpr() : Expr(NodeKind::BinaryExpr) {}
-AstChildren BinaryExpr::children() const {
-    AstChildren result;
-    appendChild(result, left);
-    appendChild(result, right);
-    return result;
-}
+    ImplItem::ImplItem() : Item(NodeKind::ImplItem) {}
+    AstChildren ImplItem::children() const {
+        AstChildren result;
+        appendChild(result, generic_parameters);
+        appendChild(result, target_type);
+        appendChild(result, where_clause);
+        appendChildren(result, items);
+        return result;
+    }
 
-AssignmentExpr::AssignmentExpr() : Expr(NodeKind::AssignmentExpr) {}
-AstChildren AssignmentExpr::children() const {
-    AstChildren result;
-    appendChild(result, place);
-    appendChild(result, value);
-    return result;
-}
+    EmptyStatement::EmptyStatement() : Statement(NodeKind::EmptyStatement) {}
+    AstChildren EmptyStatement::children() const { return {}; }
 
-CastExpr::CastExpr() : Expr(NodeKind::CastExpr) {}
-AstChildren CastExpr::children() const {
-    AstChildren result;
-    appendChild(result, value);
-    appendChild(result, target_type);
-    return result;
-}
+    LetStatement::LetStatement() : Statement(NodeKind::LetStatement) {}
+    LetStatement::~LetStatement() = default;
+    AstChildren LetStatement::children() const {
+        AstChildren result;
+        appendChild(result, declared_type);
+        appendChild(result, initializer);
+        return result;
+    }
 
-CallExpr::CallExpr() : Expr(NodeKind::CallExpr) {}
-AstChildren CallExpr::children() const {
-    AstChildren result;
-    appendChild(result, callee);
-    appendChildren(result, arguments);
-    return result;
-}
+    ExpressionStatement::ExpressionStatement() : Statement(NodeKind::ExpressionStatement) {}
+    ExpressionStatement::~ExpressionStatement() = default;
+    AstChildren ExpressionStatement::children() const {
+        AstChildren result;
+        appendChild(result, expression);
+        return result;
+    }
 
-MethodCallExpr::MethodCallExpr() : Expr(NodeKind::MethodCallExpr) {}
-AstChildren MethodCallExpr::children() const {
-    AstChildren result;
-    appendChild(result, receiver);
-    appendChild(result, method);
-    appendChildren(result, arguments);
-    return result;
-}
+    Block::Block() : AstNode(NodeKind::Block) {}
+    Block::~Block() = default;
+    Block::Block(Block&&) noexcept = default;
+    Block& Block::operator=(Block&&) noexcept = default;
+    AstChildren Block::children() const {
+        AstChildren result;
+        appendChildren(result, statements);
+        appendChild(result, tail);
+        return result;
+    }
 
-FieldAccessExpr::FieldAccessExpr() : Expr(NodeKind::FieldAccessExpr) {}
-AstChildren FieldAccessExpr::children() const {
-    AstChildren result;
-    appendChild(result, base);
-    return result;
-}
+    IntegerExpr::IntegerExpr() : Expr(NodeKind::IntegerExpr) {}
+    AstChildren IntegerExpr::children() const { return {}; }
 
-IndexExpr::IndexExpr() : Expr(NodeKind::IndexExpr) {}
-AstChildren IndexExpr::children() const {
-    AstChildren result;
-    appendChild(result, base);
-    appendChild(result, index);
-    return result;
-}
+    BooleanExpr::BooleanExpr() : Expr(NodeKind::BooleanExpr) {}
+    AstChildren BooleanExpr::children() const { return {}; }
 
-ArrayListExpr::ArrayListExpr() : Expr(NodeKind::ArrayListExpr) {}
-AstChildren ArrayListExpr::children() const {
-    AstChildren result;
-    appendChildren(result, elements);
-    return result;
-}
+    UnitExpr::UnitExpr() : Expr(NodeKind::UnitExpr) {}
+    AstChildren UnitExpr::children() const { return {}; }
 
-ArrayRepeatExpr::ArrayRepeatExpr() : Expr(NodeKind::ArrayRepeatExpr) {}
-AstChildren ArrayRepeatExpr::children() const {
-    AstChildren result;
-    appendChild(result, element);
-    appendChild(result, count);
-    return result;
-}
-
-StructInitializerField::StructInitializerField() : AstNode(NodeKind::StructInitializerField) {}
-StructInitializerField::~StructInitializerField() = default;
-AstChildren StructInitializerField::children() const {
-    AstChildren result;
-    appendChild(result, value);
-    return result;
-}
-
-StructInitExpr::StructInitExpr() : Expr(NodeKind::StructInitExpr) {}
-AstChildren StructInitExpr::children() const {
-    AstChildren result;
-    appendChild(result, path);
-    appendChildren(result, fields);
-    return result;
-}
-
-PathSegment::PathSegment() : AstNode(NodeKind::PathSegment) {}
-PathSegment::~PathSegment() = default;
-AstChildren PathSegment::children() const {
-    AstChildren result;
-    appendChildren(result, generic_arguments);
-    return result;
-}
-
-Path::Path() : AstNode(NodeKind::Path) {}
-AstChildren Path::children() const {
-    AstChildren result;
-    appendChildren(result, segments);
-    return result;
-}
-
-ConstValueSyntax::ConstValueSyntax() : AstNode(NodeKind::ConstValueSyntax) {}
-ConstValueSyntax::~ConstValueSyntax() = default;
-AstChildren ConstValueSyntax::children() const {
-    AstChildren result;
-    if (kind == ConstValueKind::Path) appendChild(result, path);
-    if (kind == ConstValueKind::Negate) appendChild(result, operand);
-    return result;
-}
-
-TypeSyntax::TypeSyntax() : AstNode(NodeKind::TypeSyntax) {}
-TypeSyntax::~TypeSyntax() = default;
-AstChildren TypeSyntax::children() const {
-    AstChildren result;
-    switch (kind) {
-    case TypeSyntaxKind::Unit:
-        break;
-    case TypeSyntaxKind::Path:
+    PathExpr::PathExpr() : Expr(NodeKind::PathExpr) {}
+    AstChildren PathExpr::children() const {
+        AstChildren result;
         appendChild(result, path);
-        break;
-    case TypeSyntaxKind::Reference:
-        appendChild(result, referent);
-        break;
-    case TypeSyntaxKind::Array:
-        appendChild(result, array_element);
-        appendChild(result, length);
-        break;
+        return result;
     }
-    return result;
-}
 
-GenericArgumentSyntax::GenericArgumentSyntax() : AstNode(NodeKind::GenericArgumentSyntax) {}
-AstChildren GenericArgumentSyntax::children() const {
-    AstChildren result;
-    if (kind == GenericArgumentKind::Type) appendChild(result, type);
-    return result;
-}
+    BlockExpr::BlockExpr() : Expr(NodeKind::BlockExpr) {}
+    AstChildren BlockExpr::children() const {
+        AstChildren result;
+        appendChild(result, block);
+        return result;
+    }
 
-AstChildren Program::children() const {
-    AstChildren result;
-    appendChildren(result, items);
-    return result;
-}
+    IfExpr::IfExpr() : Expr(NodeKind::IfExpr) {}
+    AstChildren IfExpr::children() const {
+        AstChildren result;
+        appendChild(result, condition);
+        appendChild(result, then_block);
+        appendChild(result, else_branch);
+        return result;
+    }
+
+    WhileExpr::WhileExpr() : Expr(NodeKind::WhileExpr) {}
+    AstChildren WhileExpr::children() const {
+        AstChildren result;
+        appendChild(result, condition);
+        appendChild(result, body);
+        return result;
+    }
+
+    LoopExpr::LoopExpr() : Expr(NodeKind::LoopExpr) {}
+    AstChildren LoopExpr::children() const {
+        AstChildren result;
+        appendChild(result, body);
+        return result;
+    }
+
+    BreakExpr::BreakExpr() : Expr(NodeKind::BreakExpr) {}
+    AstChildren BreakExpr::children() const {
+        AstChildren result;
+        appendChild(result, value);
+        return result;
+    }
+
+    ContinueExpr::ContinueExpr() : Expr(NodeKind::ContinueExpr) {}
+    AstChildren ContinueExpr::children() const { return {}; }
+
+    ReturnExpr::ReturnExpr() : Expr(NodeKind::ReturnExpr) {}
+    AstChildren ReturnExpr::children() const {
+        AstChildren result;
+        appendChild(result, value);
+        return result;
+    }
+
+    UnaryExpr::UnaryExpr() : Expr(NodeKind::UnaryExpr) {}
+    AstChildren UnaryExpr::children() const {
+        AstChildren result;
+        appendChild(result, operand);
+        return result;
+    }
+
+    BinaryExpr::BinaryExpr() : Expr(NodeKind::BinaryExpr) {}
+    AstChildren BinaryExpr::children() const {
+        AstChildren result;
+        appendChild(result, left);
+        appendChild(result, right);
+        return result;
+    }
+
+    AssignmentExpr::AssignmentExpr() : Expr(NodeKind::AssignmentExpr) {}
+    AstChildren AssignmentExpr::children() const {
+        AstChildren result;
+        appendChild(result, place);
+        appendChild(result, value);
+        return result;
+    }
+
+    CastExpr::CastExpr() : Expr(NodeKind::CastExpr) {}
+    AstChildren CastExpr::children() const {
+        AstChildren result;
+        appendChild(result, value);
+        appendChild(result, target_type);
+        return result;
+    }
+
+    CallExpr::CallExpr() : Expr(NodeKind::CallExpr) {}
+    AstChildren CallExpr::children() const {
+        AstChildren result;
+        appendChild(result, callee);
+        appendChildren(result, arguments);
+        return result;
+    }
+
+    MethodCallExpr::MethodCallExpr() : Expr(NodeKind::MethodCallExpr) {}
+    AstChildren MethodCallExpr::children() const {
+        AstChildren result;
+        appendChild(result, receiver);
+        appendChild(result, method);
+        appendChildren(result, arguments);
+        return result;
+    }
+
+    FieldAccessExpr::FieldAccessExpr() : Expr(NodeKind::FieldAccessExpr) {}
+    AstChildren FieldAccessExpr::children() const {
+        AstChildren result;
+        appendChild(result, base);
+        return result;
+    }
+
+    IndexExpr::IndexExpr() : Expr(NodeKind::IndexExpr) {}
+    AstChildren IndexExpr::children() const {
+        AstChildren result;
+        appendChild(result, base);
+        appendChild(result, index);
+        return result;
+    }
+
+    ArrayListExpr::ArrayListExpr() : Expr(NodeKind::ArrayListExpr) {}
+    AstChildren ArrayListExpr::children() const {
+        AstChildren result;
+        appendChildren(result, elements);
+        return result;
+    }
+
+    ArrayRepeatExpr::ArrayRepeatExpr() : Expr(NodeKind::ArrayRepeatExpr) {}
+    AstChildren ArrayRepeatExpr::children() const {
+        AstChildren result;
+        appendChild(result, element);
+        appendChild(result, count);
+        return result;
+    }
+
+    StructInitializerField::StructInitializerField() : AstNode(NodeKind::StructInitializerField) {}
+    StructInitializerField::~StructInitializerField() = default;
+    AstChildren StructInitializerField::children() const {
+        AstChildren result;
+        appendChild(result, value);
+        return result;
+    }
+
+    StructInitExpr::StructInitExpr() : Expr(NodeKind::StructInitExpr) {}
+    AstChildren StructInitExpr::children() const {
+        AstChildren result;
+        appendChild(result, path);
+        appendChildren(result, fields);
+        return result;
+    }
+
+    PathSegment::PathSegment() : AstNode(NodeKind::PathSegment) {}
+    PathSegment::~PathSegment() = default;
+    AstChildren PathSegment::children() const {
+        AstChildren result;
+        appendChildren(result, generic_arguments);
+        return result;
+    }
+
+    Path::Path() : AstNode(NodeKind::Path) {}
+    AstChildren Path::children() const {
+        AstChildren result;
+        appendChildren(result, segments);
+        return result;
+    }
+
+    ConstValueSyntax::ConstValueSyntax() : AstNode(NodeKind::ConstValueSyntax) {}
+    ConstValueSyntax::~ConstValueSyntax() = default;
+    AstChildren ConstValueSyntax::children() const {
+        AstChildren result;
+        if (kind == ConstValueKind::Path) appendChild(result, path);
+        if (kind == ConstValueKind::Negate) appendChild(result, operand);
+        return result;
+    }
+
+    TypeSyntax::TypeSyntax() : AstNode(NodeKind::TypeSyntax) {}
+    TypeSyntax::~TypeSyntax() = default;
+    AstChildren TypeSyntax::children() const {
+        AstChildren result;
+        switch (kind) {
+        case TypeSyntaxKind::Unit:
+            break;
+        case TypeSyntaxKind::Path:
+            appendChild(result, path);
+            break;
+        case TypeSyntaxKind::Reference:
+            appendChild(result, referent);
+            break;
+        case TypeSyntaxKind::Array:
+            appendChild(result, array_element);
+            appendChild(result, length);
+            break;
+        }
+        return result;
+    }
+
+    GenericArgumentSyntax::GenericArgumentSyntax() : AstNode(NodeKind::GenericArgumentSyntax) {}
+    AstChildren GenericArgumentSyntax::children() const {
+        AstChildren result;
+        if (kind == GenericArgumentKind::Type) appendChild(result, type);
+        return result;
+    }
+
+    AstChildren Program::children() const {
+        AstChildren result;
+        appendChildren(result, items);
+        return result;
+    }
 
 }  // namespace rx::ast

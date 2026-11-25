@@ -1,6 +1,7 @@
+
 #pragma once
 
-#include "rx/semantic/type.hpp"
+#include "rx/semantic/info.hpp"
 
 #include <string>
 #include <unordered_map>
@@ -9,19 +10,20 @@ namespace rx::semantic {
 
     struct LocalSymbol {
         Type type;
-        bool mutable_binding = false;//是否可移动
+        bool mutable_binding = false;
+        BindingId binding_id = 0;
     };
 
-    class Scope {//作用域类，通过链表套unordered map模拟不同作用域
+    class Scope {
     public:
         explicit Scope(Scope* parent = nullptr);
 
-        void define(//定义一个变量
+        void define(
             const std::string& name,
             const LocalSymbol& symbol
         );
 
-        LocalSymbol* find(//在所有定义域找
+        LocalSymbol* find(
             const std::string& name
         );
 
@@ -29,7 +31,7 @@ namespace rx::semantic {
             const std::string& name
         ) const;
 
-        LocalSymbol* findCurrent(//在当前定义域找
+        LocalSymbol* findCurrent(
             const std::string& name
         );
 

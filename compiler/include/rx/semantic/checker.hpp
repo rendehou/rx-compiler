@@ -6,6 +6,7 @@
 #include "rx/semantic/declaration.hpp"
 #include "rx/semantic/type.hpp"
 #include "rx/semantic/scope.hpp"
+#include "rx/semantic/info.hpp"
 
 #include <memory>
 #include <string>
@@ -45,8 +46,12 @@ namespace rx::semantic {
         bool checkProgram(
             const std::shared_ptr<ast::Program>& program
         );
+        const SemanticInfo& getInfo() const;
 
     private:
+
+        SemanticInfo info_;
+        BindingId next_binding_id_ = 0;
 
         bool checkFunction(
             const std::shared_ptr<ast::FunctionItem>& function,
@@ -73,7 +78,13 @@ namespace rx::semantic {
             const Type* expected_type =nullptr
         );
 
-
+        ExprResult checkExprImpl(
+            const std::shared_ptr<ast::Expr>& expr,
+            Scope& scope,
+            CheckContext& context,
+            const Type* expected_type = nullptr
+        );
+        
         // 具体的Expr
         ExprResult checkUnary(
             const std::shared_ptr<ast::UnaryExpr>& expr,

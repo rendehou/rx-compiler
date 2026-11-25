@@ -17,18 +17,24 @@ namespace rx::frontend {
             std::any_cast<std::shared_ptr<ast::AstNode>>(value)
         );
     }
-
+    
     std::shared_ptr<ast::Program> AstBuilder::build(
         RxParser::CrateContext* ctx
     ) {
-        
+
         auto node = std::any_cast<std::shared_ptr<ast::AstNode>>(
             visit(ctx)
         );
 
-        return std::dynamic_pointer_cast<ast::Program>(
-            node
-        );
+        std::shared_ptr<ast::Program> program =
+            std::dynamic_pointer_cast<ast::Program>(node);
+
+        // AST 构建完成后，统一分配节点编号
+        if (program) {
+            ast::assignNodeIds(*program);
+        }
+
+        return program;
     }
 
     //下面开始是具体的

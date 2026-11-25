@@ -12,6 +12,9 @@ namespace rx::semantic {
     bool Checker::checkProgram(
         const std::shared_ptr<ast::Program>& program
     ) {
+        info_ = SemanticInfo();
+        next_binding_id_ = 0;
+
         if (!program) {
             return false;
         }
@@ -124,6 +127,7 @@ namespace rx::semantic {
         return true;
     }
 
+    
     bool Checker::checkFunction(
         const std::shared_ptr<ast::FunctionItem>& function,
         const std::string& self_type
@@ -144,7 +148,9 @@ namespace rx::semantic {
         }
 
         // 获取函数返回类型，没有就是Unit
-        Type return_type = function->return_type ? resolveType(function->return_type, self_type) : Type::makeUnit();
+        Type return_type = function->return_type
+            ? resolveType(function->return_type, self_type)
+            : Type::makeUnit();
 
         if (return_type.isError()) {
             return false;
@@ -160,16 +166,13 @@ namespace rx::semantic {
             bool mutable_binding = false;
 
             switch (function->receiver->kind) {
-                // self
                 case ast::ReceiverKind::Value:
                     break;
 
-                // mut self
                 case ast::ReceiverKind::MutableValue:
                     mutable_binding = true;
                     break;
 
-                // &self
                 case ast::ReceiverKind::SharedReference:
                     receiver_type = Type::makeReference(
                         receiver_type,
@@ -177,7 +180,6 @@ namespace rx::semantic {
                     );
                     break;
 
-                // &mut self
                 case ast::ReceiverKind::MutableReference:
                     receiver_type = Type::makeReference(
                         receiver_type,
@@ -186,11 +188,17 @@ namespace rx::semantic {
                     break;
             }
 
+            // 为self分配唯一编号
+            BindingId binding_id = next_binding_id_++;
+
+            info_.bindings[function->receiver.get()] = binding_id;
+
             function_scope.define(
                 "self",
                 LocalSymbol{
                     receiver_type,
-                    mutable_binding
+                    mutable_binding,
+                    binding_id
                 }
             );
         }
@@ -217,12 +225,18 @@ namespace rx::semantic {
                 return false;
             }
 
+            // 为参数分配唯一编号
+            BindingId binding_id = next_binding_id_++;
+
+            info_.bindings[parameter.get()] = binding_id;
+
             // 将参数加入函数作用域
             function_scope.define(
                 parameter->name,
                 LocalSymbol{
                     parameter_type,
-                    parameter->mutable_binding
+                    parameter->mutable_binding,
+                    binding_id
                 }
             );
         }
@@ -249,8 +263,10 @@ namespace rx::semantic {
         if (!canAssignment(body_result.type, return_type)) {
             return false;
         }
+
         return true;
     }
+
 
     ExprResult Checker::checkBlock(
         const std::shared_ptr<ast::Block>& block,
@@ -324,6 +340,7 @@ namespace rx::semantic {
         return {Type::makeUnit()};
     }
 
+    
     ExprResult Checker::checkStatement(
         const std::shared_ptr<ast::Statement>& statement,
         Scope& scope,
@@ -375,7 +392,7 @@ namespace rx::semantic {
                 initializer_never = initializer.type.isNever();
 
                 if (let->declared_type) {
-                    // 有显示类型，就比较
+                    // 有显式类型，就比较
                     if (!canAssignment(initializer.type, variable_type)) {
                         return {Type::makeError()};
                     }
@@ -398,12 +415,18 @@ namespace rx::semantic {
                 return {Type::makeError()};
             }
 
+            // 为当前变量分配唯一编号
+            BindingId binding_id = next_binding_id_++;
+
+            info_.bindings[let.get()] = binding_id;
+
             // 定义变量
             scope.define(
                 let->name,
                 LocalSymbol{
                     variable_type,
-                    let->mutable_binding
+                    let->mutable_binding,
+                    binding_id
                 }
             );
 
@@ -416,7 +439,8 @@ namespace rx::semantic {
         }
 
         // 表达式语句
-        if (auto expression = std::dynamic_pointer_cast<ast::ExpressionStatement>(statement)) {
+        if (auto expression =
+            std::dynamic_pointer_cast<ast::ExpressionStatement>(statement)) {
 
             if (!expression->expression) {
                 return {Type::makeError()};
@@ -448,6 +472,7 @@ namespace rx::semantic {
 
         return {Type::makeError()};
     }
+
 
     ExprResult Checker::checkExpr(
         const std::shared_ptr<ast::Expr>& expr,
@@ -2343,6 +2368,7 @@ namespace rx::semantic {
         return {Type::makeNever()};
     }
 
+    
     ExprResult Checker::checkPath(
         const std::shared_ptr<ast::PathExpr>& expr,
         Scope& scope,
@@ -2366,6 +2392,10 @@ namespace rx::semantic {
 
             // 在当前scope将name当作变量查找
             if (auto symbol = scope.find(name)) {
+
+                // 记录当前PathExpr对应的变量编号
+                info_.bindings[expr.get()] = symbol->binding_id;
+
                 return {
                     symbol->type,
                     true,
@@ -2395,11 +2425,12 @@ namespace rx::semantic {
             return {Type::makeError()};
         }
 
-         // 多段path，处理关联常量，例如 A::X 或 Self::X
+        // 多段path，处理关联常量，例如 A::X 或 Self::X
         const auto& parts = expr->path->segments;
 
-        if (parts.size() != 2 || parts[0]->name.empty() || 
-            parts[1]->name.empty() || !parts[1]->generic_arguments.empty()) {
+        if (parts.size() != 2 || parts[0]->name.empty() ||
+            parts[1]->name.empty() ||
+            !parts[1]->generic_arguments.empty()) {
             return {Type::makeError()};
         }
 
@@ -2431,8 +2462,10 @@ namespace rx::semantic {
         // 查找对应名称
         auto member = map->second.find(parts[1]->name);
 
-        if (member == map->second.end() || member->second.kind != ValueSymbolKind::Constant ||
-            !member->second.constant || !member->second.constant->type) {
+        if (member == map->second.end() ||
+            member->second.kind != ValueSymbolKind::Constant ||
+            !member->second.constant ||
+            !member->second.constant->type) {
             return {Type::makeError()};
         }
 
@@ -2449,6 +2482,7 @@ namespace rx::semantic {
         // 常量不是可以赋值的存储位置
         return {result, false, false};
     }
+
 
     // 检查函数的普通参数
     bool Checker::checkArguments(
@@ -3234,5 +3268,8 @@ namespace rx::semantic {
         // 所有候选类型都找不到方法
         return {Type::makeError()};
     }
-
+    
+    const SemanticInfo& Checker::getInfo() const {
+        return info_;
+    }
 } // namespace rx::semantic

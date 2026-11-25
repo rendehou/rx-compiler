@@ -13,6 +13,9 @@ namespace rx::semantic {
 
     using BindingId = std::size_t;
 
+    // AST 节点编号
+    using NodeId = ast::NodeId;
+    
     // 方法调用时已经进行的类型转换，包括函数，struct的隐式类型转换，自动借用，自动解引用等
     enum class AdjustmentKind {
         Deref,
@@ -29,13 +32,13 @@ namespace rx::semantic {
     struct SemanticInfo {
 
         // 每个变量绑定对应一个不同的编号
-        std::unordered_map<const ast::AstNode*, BindingId> bindings;
+        std::unordered_map<NodeId, BindingId> bindings;
 
         // 对每个ast表达式给出类型
-        std::unordered_map<const ast::Expr*, Type> expr_types;
+        std::unordered_map<NodeId, Type> expr_types;
 
         // 为函数调用类型直接给出结果
-        std::unordered_map<const ast::Expr*, CallResolution> calls;
+        std::unordered_map<NodeId, CallResolution> calls;
         
     };
 
