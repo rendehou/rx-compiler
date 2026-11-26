@@ -25,7 +25,7 @@ namespace rx::ir {
         IRModule module_;
 
         // Ir函数编号
-        std::unordered_map<const ast::FunctionItem*, FunctionId> functions_;
+        std::unordered_map<ast::NodeId, FunctionId> functions_;
 
 
         // 第一遍收集函数签名、类型、常量等

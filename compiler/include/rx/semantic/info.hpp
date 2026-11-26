@@ -40,6 +40,8 @@ namespace rx::semantic {
         // 为函数调用类型直接给出结果
         std::unordered_map<NodeId, CallResolution> calls;
         
+        // 对变量绑定直接给出类型
+        std::unordered_map<BindingId, Type> binding_types;
     };
 
 }

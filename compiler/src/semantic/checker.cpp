@@ -191,7 +191,7 @@ namespace rx::semantic {
             // 为self分配唯一编号
             BindingId binding_id = next_binding_id_++;
 
-            info_.bindings[function->receiver.get()] = binding_id;
+            info_.bindings[function->receiver->node_id] = binding_id;
 
             function_scope.define(
                 "self",
@@ -228,7 +228,7 @@ namespace rx::semantic {
             // 为参数分配唯一编号
             BindingId binding_id = next_binding_id_++;
 
-            info_.bindings[parameter.get()] = binding_id;
+            info_.bindings[parameter->node_id] = binding_id;
 
             // 将参数加入函数作用域
             function_scope.define(
@@ -417,8 +417,13 @@ namespace rx::semantic {
 
             // 为当前变量分配唯一编号
             BindingId binding_id = next_binding_id_++;
+            
+            // 保存变量的语义类型
+            info_.binding_types[binding_id] = variable_type;
 
-            info_.bindings[let.get()] = binding_id;
+            info_.bindings[let->node_id] = binding_id;
+
+            
 
             // 定义变量
             scope.define(
@@ -473,8 +478,30 @@ namespace rx::semantic {
         return {Type::makeError()};
     }
 
-
+    // 为ir服务，将checkexpr再包装一层，这样能存储semantic检查后的expr类型
     ExprResult Checker::checkExpr(
+        const std::shared_ptr<ast::Expr>& expr,
+        Scope& scope,
+        CheckContext& context,
+        const Type* expected_type
+    ) {
+        // 调用原来的表达式检查逻辑
+        ExprResult result = checkExprImpl(
+            expr,
+            scope,
+            context,
+            expected_type
+        );
+
+        // 保存表达式的类型
+        if (expr && !result.type.isError()) {
+            info_.expr_types[expr->node_id] = result.type;
+        }
+
+        return result;
+    }
+
+    ExprResult Checker::checkExprImpl(
         const std::shared_ptr<ast::Expr>& expr,
         Scope& scope,
         CheckContext& context,
@@ -2394,7 +2421,7 @@ namespace rx::semantic {
             if (auto symbol = scope.find(name)) {
 
                 // 记录当前PathExpr对应的变量编号
-                info_.bindings[expr.get()] = symbol->binding_id;
+                info_.bindings[expr->node_id] = symbol->binding_id;
 
                 return {
                     symbol->type,
@@ -3268,7 +3295,7 @@ namespace rx::semantic {
         // 所有候选类型都找不到方法
         return {Type::makeError()};
     }
-    
+
     const SemanticInfo& Checker::getInfo() const {
         return info_;
     }
