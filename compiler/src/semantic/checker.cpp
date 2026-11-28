@@ -40,17 +40,40 @@ namespace rx::semantic {
         ConstEvaluator evaluator;
 
         for (const auto& item : program->items) {
-            auto constant = std::dynamic_pointer_cast<ast::ConstantItem>(item);
 
-            if (!constant) {
+        // 将原来检查item的部分加上impl
+        if (auto function = std::dynamic_pointer_cast<ast::FunctionItem>(item)) {
+            if (!checkFunction(function, "")) {
+                return false;
+            }
+            continue;
+        }
+
+        // impl 中的方法
+        auto implementation = std::dynamic_pointer_cast<ast::ImplItem>(item);
+
+        if (!implementation) {
+            continue;
+        }
+        Type owner_type = resolveType(
+            implementation->target_type
+        );
+        if (!owner_type.isStruct()) {
+            return false;
+        }
+
+        for (const auto& associated_item : implementation->items) {
+
+            auto function = std::get_if<std::shared_ptr<ast::FunctionItem> >(&associated_item->value);
+
+            if (!function) {
                 continue;
             }
-
-            ConstValue value;
-            if (!evaluator.evaluateConstant(constant, value)) {
+            if (!*function || !checkFunction(*function, owner_type.struct_name)) {
                 return false;
             }
         }
+    }
 
         // 检查所有关联常量，包括未被其他表达式引用的常量
         for (const auto& owner : associated_map) {
@@ -113,6 +136,42 @@ namespace rx::semantic {
             }
         }
 
+        // 收集struct信息
+        for (const auto& item : program->items) {
+
+            auto structure = std::dynamic_pointer_cast<ast::StructItem>(item);
+
+            if (!structure) {
+                continue;
+            }
+
+            StructInfo struct_info;
+            struct_info.name = structure->name;
+
+            for (std::size_t i = 0; i < structure->fields.size(); ++i) {
+
+                const auto& field = structure->fields[i];
+
+                Type field_type = resolveType(
+                    field->type,
+                    structure->name
+                );
+
+                if (field_type.isError()) {
+                    return false;
+                }
+
+                StructFieldInfo field_info;
+                field_info.name = field->name;
+                field_info.type = field_type;
+                field_info.index = i;
+
+                struct_info.fields.push_back(field_info);
+            }
+
+            info_.structs[structure->node_id] = struct_info;
+        }
+
         // 检查函数体
         for (const auto& item : program->items) {
 
@@ -159,6 +218,11 @@ namespace rx::semantic {
         // 创建函数作用域
         Scope function_scope;
 
+        FunctionInfo function_info;
+
+        function_info.return_type = return_type;
+        function_info.owner_type = self_type;
+
         // 处理self接收者
         if (function->receiver) {
 
@@ -188,10 +252,12 @@ namespace rx::semantic {
                     break;
             }
 
-            // 为self分配唯一编号
+            // 为self分配唯一编号，同时记录参数，self为列表中首个元素
             BindingId binding_id = next_binding_id_++;
-
             info_.bindings[function->receiver->node_id] = binding_id;
+
+            info_.binding_types[binding_id] = receiver_type;
+            function_info.parameter_bindings.push_back(binding_id);
 
             function_scope.define(
                 "self",
@@ -225,10 +291,12 @@ namespace rx::semantic {
                 return false;
             }
 
-            // 为参数分配唯一编号
+            // 为参数分配唯一编号，同时记录参数
             BindingId binding_id = next_binding_id_++;
-
             info_.bindings[parameter->node_id] = binding_id;
+
+            info_.binding_types[binding_id] = parameter_type;
+            function_info.parameter_bindings.push_back(binding_id);
 
             // 将参数加入函数作用域
             function_scope.define(
@@ -247,6 +315,8 @@ namespace rx::semantic {
         context.return_type = return_type;
         context.self_type = self_type;
 
+        info_.functions[function->node_id] = function_info;
+        
         // 检查函数体
         ExprResult body_result = checkBlock(
             function->body,
@@ -417,7 +487,7 @@ namespace rx::semantic {
 
             // 为当前变量分配唯一编号
             BindingId binding_id = next_binding_id_++;
-            
+
             // 保存变量的语义类型
             info_.binding_types[binding_id] = variable_type;
 

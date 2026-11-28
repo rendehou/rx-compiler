@@ -180,4 +180,236 @@ namespace rx::ir{
         }
     }
 
+    IRResult IRGenerator::generateInteger(
+        const ast::IntegerExpr& expr,
+        FunctionContext& context
+    ) {
+        // 获取 Semantic 已经确定的整数类型
+        auto type_it = info_.expr_types.find(expr.node_id);
+
+        if (type_it == info_.expr_types.end() ||
+            !type_it->second.isInteger()) {
+            throw std::runtime_error(
+                "Missing integer expression type"
+            );
+        }
+
+        // 转换成 IR 类型
+        IRType type = lowerType(type_it->second);
+
+        // 去掉整数中的下划线和类型后缀
+        std::string spelling = expr.spelling;
+
+        const std::string suffixes[] = {// 注意不一定是i32
+            "usize", "isize", "i32", "u32"
+        };
+
+        for (const std::string& suffix : suffixes) {
+            if (spelling.size() >= suffix.size() &&
+                spelling.compare(spelling.size() - suffix.size(), suffix.size(), suffix ) == 0) {
+
+                spelling.erase( spelling.size() - suffix.size());
+                break;
+            }
+        }
+
+        std::string digits;
+
+        for (char c : spelling) {
+            if (c != '_') {
+                digits.push_back(c);
+            }
+        }
+
+        // 根据前缀判断进制
+        int base = 10;
+
+        if (digits.size() > 2 && digits[0] == '0') {
+            if (digits[1] == 'x' || digits[1] == 'X') {
+                base = 16;
+                digits.erase(0, 2);
+            }
+            else if (digits[1] == 'b' || digits[1] == 'B') {
+                base = 2;
+                digits.erase(0, 2);
+            }
+            else if (digits[1] == 'o' || digits[1] == 'O') {
+                base = 8;
+                digits.erase(0, 2);
+            }
+        }
+
+        // 解析整数数值
+        std::size_t position = 0;
+        unsigned long long number = 0;
+
+        try {
+            number = std::stoull(digits, &position, base);
+        }
+        catch (...) {
+            throw std::runtime_error(
+                "Invalid integer literal"
+            );
+        }
+
+        if (digits.empty() || position != digits.size() ||
+            number > 0xFFFFFFFFULL) {
+            throw std::runtime_error(
+                "Integer literal out of range"
+            );
+        }
+
+        // 构造整数常量
+        IRValue value;
+        value.kind = IRValueKind::IntegerConstant;
+        value.type = type;
+        value.integer = static_cast<std::int64_t>(number);
+
+        // 返回表达式结果
+        IRResult result;
+        result.has_value = true;
+        result.value = value;
+
+        return result;
+    }
+
+
+    IRResult IRGenerator::generateBoolean(
+        const ast::BooleanExpr& expr,
+        FunctionContext& context
+    ) {
+        // bool 在 LLVM IR 中是 i1
+        IRType type;
+        type.kind = IRTypeKind::Integer;
+        type.bits = 1;
+
+        // 创建布尔常量
+        IRValue value;
+        value.kind = IRValueKind::IntegerConstant;
+        value.type = type;
+        value.integer = expr.value ? 1 : 0;
+
+        IRResult result;
+        result.has_value = true;
+        result.value = value;
+
+        return result;
+    }
+
+
+    IRResult IRGenerator::generatePath(
+        const ast::PathExpr& expr,
+        FunctionContext& context
+    ) {
+        // 根据表达式 NodeId 找到 BindingId
+        auto binding_it = info_.bindings.find(expr.node_id);
+
+        if (binding_it == info_.bindings.end()) {
+            throw std::runtime_error(
+                "Path is not a local variable"
+            );
+        }
+
+        semantic::BindingId binding_id = binding_it->second;
+        // 根据 BindingId 找到变量的存储位置
+        auto local_it = context.locals.find(binding_id);
+
+        if (local_it == context.locals.end()) {
+            throw std::runtime_error(
+                "Local variable has no IR storage"
+            );
+        }
+
+        // 读取变量的值
+        return emitRead(local_it->second, context);
+    }
+
+
+    IRResult IRGenerator::generateLet(
+        const ast::LetStatement& statement,
+        FunctionContext& context
+    ) {
+        // 查找变量的 BindingId
+        auto binding_it = info_.bindings.find(
+            statement.node_id
+        );
+
+        if (binding_it == info_.bindings.end()) {
+            throw std::runtime_error(
+                "Missing let binding"
+            );
+        }
+
+        semantic::BindingId binding_id = binding_it->second;
+
+        // 获取变量的语义类型
+        auto type_it = info_.binding_types.find(binding_id);
+
+        if (type_it == info_.binding_types.end()) {
+            throw std::runtime_error(
+                "Missing variable type"
+            );
+        }
+
+        // 转换为 IR 类型
+        IRType type = lowerType(type_it->second);
+
+        if (type.kind == IRTypeKind::Void) {
+            throw std::runtime_error(
+                "Void variable storage is not supported"
+            );
+        }
+
+        // 如果有初始化表达式，先生成它
+        IRResult initializer;
+
+        if (statement.initializer) {
+            initializer = generateExpr(
+                *statement.initializer,
+                context
+            );
+
+            // return、break 等导致无法继续执行
+            if (!initializer.falls_through) {
+                return initializer;
+            }
+
+            if (!initializer.has_value) {
+                throw std::runtime_error(
+                    "Initializer has no value"
+                );
+            }
+        }
+
+        // 为变量创建存储空间
+        IRValue address = context.builder.createAlloca(type);
+
+        IRPlace place;
+        place.address = address;
+        place.type = type;
+
+        // 记录变量的存储位置
+        if (context.locals.find(binding_id) !=
+            context.locals.end()) {
+            throw std::runtime_error(
+                "Duplicate variable binding"
+            );
+        }
+
+        context.locals[binding_id] = place;
+
+        // 将初始化值写入存储位置
+        if (statement.initializer) {
+            emitWrite(
+                place,
+                initializer.value,
+                context
+            );
+        }
+
+        // let 语句自身不产生值
+        IRResult result;
+        return result;
+    }
+
 }

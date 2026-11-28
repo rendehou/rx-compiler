@@ -24,8 +24,37 @@ namespace rx::semantic {
     };
 
     struct CallResolution {
-        std::string target; // 解析后的函数或方法标识
+
+        std::string target;
+
+        // 最终解析到的函数 AST 节点
+        NodeId function_node = ast::InvalidNodeId;
+
+        // 自动解引用、自动借用等调整
         std::vector<AdjustmentKind> receiver_adjustments;
+    };
+
+    struct FunctionInfo {
+
+        // 函数返回类型
+        Type return_type;
+
+        // 函数所属结构体，普通函数为空
+        std::string owner_type;
+
+        // 参数对应的 BindingId，如果有 self，self为第一个
+        std::vector<BindingId> parameter_bindings;
+    };
+
+    struct StructFieldInfo {
+        std::string name;
+        Type type;
+        std::size_t index = 0;
+    };
+
+    struct StructInfo {
+        std::string name;
+        std::vector<StructFieldInfo> fields;
     };
 
     // 传递给ir的结果
@@ -42,6 +71,15 @@ namespace rx::semantic {
         
         // 对变量绑定直接给出类型
         std::unordered_map<BindingId, Type> binding_types;
+
+        // 函数调用表
+        std::unordered_map<NodeId, CallResolution> calls;
+
+        // 函数信息表
+        std::unordered_map<NodeId, FunctionInfo> functions;
+
+        // 结构体信息表
+        std::unordered_map<NodeId, StructInfo> structs;
     };
 
 }
